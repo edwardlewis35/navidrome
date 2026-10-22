@@ -79,9 +79,15 @@ const stylesheet = `
     background-color: #ec4141 !important;
     border-color: #ec4141;
 }
-.react-jinke-music-player-mobile {
+.react-jinke-music-player-main.light-theme .react-jinke-music-player-mobile {
     background: #fcf9f8;
     color: #30313a;
+}
+.react-jinke-music-player-main.light-theme .react-jinke-music-player-mobile svg {
+    color: #ec4141;
+}
+.react-jinke-music-player-main.light-theme .react-jinke-music-player-mobile-operation svg {
+    color: #777985;
 }
 .react-jinke-music-player-mobile .react-jinke-music-player-mobile-cover img.cover {
     border-radius: 16px;
