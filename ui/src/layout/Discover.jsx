@@ -257,7 +257,7 @@ const useStyles = makeStyles((theme) => ({
     heroGrid: { gridTemplateColumns: '1fr', marginBottom: 28 },
     hero: { minHeight: 238 },
     sideHero: { display: 'none' },
-    disc: { right: -25, opacity: 0.8 },
+    disc: { right: -25, opacity: 0.18 },
     heroTitle: { fontSize: 27 },
     grid: { gridTemplateColumns: 'repeat(2,minmax(0,1fr))' },
     sectionTitle: { fontSize: 18 },
