@@ -4,7 +4,10 @@ const useStyle = makeStyles(
   (theme) => ({
     audioTitle: {
       textDecoration: 'none',
-      color: theme.palette.primary.dark,
+      color: '#f2f2f3',
+      '&:hover': {
+        color: '#ff6b6b',
+      },
     },
     songTitle: {
       fontWeight: 'bold',

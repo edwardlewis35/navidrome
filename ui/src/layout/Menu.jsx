@@ -29,8 +29,13 @@ const useStyles = makeStyles((theme) => ({
     width: 55,
   },
   active: {
-    color: theme.palette.text.primary,
-    fontWeight: 'bold',
+    color: '#ff6b6b !important',
+    backgroundColor: 'rgba(236, 65, 65, 0.12)',
+    borderLeft: '3px solid #ec4141',
+    fontWeight: 600,
+    '& svg': {
+      color: '#ff6b6b',
+    },
   },
 }))
 

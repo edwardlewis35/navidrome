@@ -8,7 +8,15 @@ import { useRefreshMetadata } from './useRefreshMetadata'
 
 const useStyles = makeStyles({
   // Tooltip needs a ref-holding child, and react-admin's Button does not forward one.
-  wrapper: { display: 'inline-flex', verticalAlign: 'middle' },
+  wrapper: {
+    display: 'inline-flex',
+    verticalAlign: 'middle',
+    // Keep the mobile album toolbar on a single row; metadata refresh is a
+    // desktop-only maintenance action.
+    '@media screen and (max-width: 720px)': {
+      display: 'none',
+    },
+  },
   button: { minWidth: 'auto' },
 })
 

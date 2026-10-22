@@ -21,6 +21,7 @@ import RosePineMoonTheme from './rosePineMoon'
 import AmusicTheme from './amusic'
 import SquiddiesGlassTheme from './SquiddiesGlass'
 import NautilineTheme from './nautiline'
+import NetEaseTheme from './netease'
 import MoonbaseAlphaTheme from './moonbaseAlpha'
 import MoonbaseBravoTheme from './moonbaseBravo'
 import TokyoNightLightTheme from './tokyoNightLight'
@@ -49,6 +50,7 @@ export default {
   MoonbaseAlphaTheme,
   MoonbaseBravoTheme,
   NautilineTheme,
+  NetEaseTheme,
   NordTheme,
   NuclearTheme,
   NutballTheme,

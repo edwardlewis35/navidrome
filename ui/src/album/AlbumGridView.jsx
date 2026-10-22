@@ -99,6 +99,7 @@ const useCoverStyles = makeStyles({
     width: '100%',
     aspectRatio: '1',
     overflow: 'hidden',
+    borderRadius: 10,
   },
   cover: {
     display: 'inline-block',
@@ -109,6 +110,7 @@ const useCoverStyles = makeStyles({
     aspectRatio: '1',
     height: (props) => props.height,
     transition: 'opacity 0.3s ease-in-out',
+    borderRadius: 10,
   },
 })
 
@@ -116,8 +118,8 @@ const getColsForWidth = (width) => {
   if (width === 'xs') return 2
   if (width === 'sm') return 3
   if (width === 'md') return 4
-  if (width === 'lg') return 6
-  return 9
+  if (width === 'lg') return 5
+  return 7
 }
 
 const Cover = withContentRect('bounds')(({
