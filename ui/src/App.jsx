@@ -50,6 +50,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DndProvider } from 'react-dnd'
 import missing from './missing/index.js'
 import { useEffect } from 'react'
+import Discover from './layout/Discover'
 
 const history = createHashHistory()
 
@@ -119,6 +120,7 @@ const Admin = (props) => {
       customRoutes={customRoutes}
       history={history}
       layout={Layout}
+      dashboard={Discover}
       loginPage={Login}
       logoutButton={Logout}
       {...props}

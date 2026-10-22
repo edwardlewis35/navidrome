@@ -1,0 +1,11 @@
+services:
+  navidrome:
+    image: ghcr.io/edwardlewis35/navidrome:netease-ui
+    ports:
+      - "4533:4533"
+    environment:
+      ND_LOGLEVEL: info
+    volumes:
+      - "${NAVIDROME_DATA_PATH:-./netease-data}:/data"
+      - "${NAVIDROME_MUSIC_PATH:-./music}:/music:ro"
+    restart: unless-stopped
