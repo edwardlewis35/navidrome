@@ -111,7 +111,8 @@ jobs:
             -e ND_ENABLEINSIGHTSCOLLECTOR=false \
             "$IMAGE"
           trap 'docker logs navidrome-smoke; docker rm -fv navidrome-smoke' EXIT
-          curl --fail --retry 30 --retry-connrefused --retry-delay 2 \
+          curl --fail --retry 30 --retry-connrefused --retry-all-errors \
+            --retry-delay 2 --retry-max-time 120 --max-time 5 \
             http://127.0.0.1:4533/ping
           curl --fail --location http://127.0.0.1:4533/app/ > /tmp/navidrome-ui.html
           grep -q '<div id="root"' /tmp/navidrome-ui.html
