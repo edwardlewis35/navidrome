@@ -30,7 +30,7 @@ func testCatalog(t *testing.T, handler http.HandlerFunc) *Catalog {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-	catalog := NewCatalog()
+	catalog := newCatalog("")
 	catalog.musicBrainz = server.URL
 	catalog.archive = server.URL
 	return catalog
@@ -147,7 +147,7 @@ func TestSearchReportsAllFrontFailuresAndKeepsUsablePartialResults(t *testing.T)
 }
 
 func TestSearchRateLimitDoesNotQueueOrExtendWait(t *testing.T) {
-	c := NewCatalog()
+	c := newCatalog("")
 	if err := c.reserveSearch(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestDownloadValidatesAndReencodesBoundedImages(t *testing.T) {
 			}
 		})
 	}
-	c := NewCatalog()
+	c := newCatalog("")
 	if _, err := c.Download(t.Context(), "../../secret"); !errors.Is(err, ErrInvalidSelection) {
 		t.Fatal("non-release identifier accepted")
 	}
@@ -272,5 +272,113 @@ func TestCoverRedirectsStayOnFixedHTTPSArchiveHosts(t *testing.T) {
 	c := testCatalog(t, func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, http.StatusFound) })
 	if _, err := c.Download(t.Context(), fixtureRelease); !errors.Is(err, ErrUnavailable) || targetCalls.Load() != 0 {
 		t.Fatal("followed untrusted redirect")
+	}
+}
+
+func TestCoverProxyRoutesCatalogueAndImagesWithoutChangingOtherClients(t *testing.T) {
+	var proxyCalls atomic.Int32
+	imageData := fixturePNG(t)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyCalls.Add(1)
+		if r.Header.Get("User-Agent") != userAgent || !r.URL.IsAbs() {
+			t.Error("proxy did not receive an identified absolute request")
+		}
+		switch {
+		case r.URL.Host == "musicbrainz.cover.test" && strings.HasPrefix(r.URL.Path, "/ws/"):
+			_, _ = io.WriteString(w, `{"releases":[{"id":"`+fixtureRelease+`","title":"Proxy fixture"}]}`)
+		case r.URL.Host == "archive.cover.test" && r.URL.Path == "/release/"+fixtureRelease:
+			_, _ = io.WriteString(w, `{"images":[{"front":true}]}`)
+		case r.URL.Host == "archive.cover.test" && strings.HasSuffix(r.URL.Path, "/front-500"):
+			_, _ = w.Write(imageData)
+		default:
+			t.Errorf("unexpected proxy destination: %s", r.URL.Host)
+			http.NotFound(w, r)
+		}
+	}))
+	defer proxy.Close()
+	defaultTransport := http.DefaultTransport
+	c := newCatalog(proxy.URL)
+	c.musicBrainz = "http://musicbrainz.cover.test"
+	c.archive = "http://archive.cover.test"
+	transport, ok := c.client.Transport.(*http.Transport)
+	if !ok || transport == defaultTransport || http.DefaultTransport != defaultTransport {
+		t.Fatal("proxy did not use an independent transport")
+	}
+	defer transport.CloseIdleConnections()
+	results, err := c.Search(t.Context(), "Proxy fixture", "")
+	if err != nil || len(results) != 1 || results[0].ID != fixtureRelease {
+		t.Fatalf("catalogue requests did not use proxy: %v %+v", err, results)
+	}
+	if _, err := c.Download(t.Context(), fixtureRelease); err != nil || proxyCalls.Load() != 3 {
+		t.Fatalf("image request did not use proxy: %v calls=%d", err, proxyCalls.Load())
+	}
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer origin.Close()
+	otherClient := &http.Client{Timeout: time.Second}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, origin.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := otherClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusNoContent || proxyCalls.Load() != 3 || http.DefaultTransport != defaultTransport {
+		t.Fatal("catalogue proxy changed another HTTP client")
+	}
+}
+
+func TestCoverProxyRejectsInvalidConfigurationWithoutDirectFallback(t *testing.T) {
+	var directCalls atomic.Int32
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		directCalls.Add(1)
+		_, _ = io.WriteString(w, `{"releases":[]}`)
+	}))
+	defer origin.Close()
+	for _, proxy := range []string{
+		" ", "://invalid", "proxy:7891", "socks5://proxy:7891", "http://proxy",
+		"http://proxy:0", "http://proxy:65536", "http://proxy:invalid",
+		"http://user:private-value@proxy:7891", "http://proxy:7891/",
+		"http://proxy:7891?", "http://proxy:7891?token=private-value",
+		"http://proxy:7891#", "http://proxy:7891#private-value",
+	} {
+		t.Run(proxy, func(t *testing.T) {
+			c := newCatalog(proxy)
+			c.musicBrainz, c.archive = origin.URL, origin.URL
+			_, searchErr := c.Search(t.Context(), "fixture", "")
+			_, downloadErr := c.Download(t.Context(), fixtureRelease)
+			if !errors.Is(searchErr, ErrUnavailable) || !errors.Is(downloadErr, ErrUnavailable) || directCalls.Load() != 0 {
+				t.Fatalf("invalid proxy fell back to a request: search=%v download=%v calls=%d", searchErr, downloadErr, directCalls.Load())
+			}
+			if strings.Contains(searchErr.Error(), "private-value") || strings.Contains(downloadErr.Error(), "private-value") {
+				t.Fatal("proxy error exposed its configuration")
+			}
+		})
+	}
+}
+
+func TestCoverProxyKeepsDefaultsAndSupportsHTTPAndHTTPS(t *testing.T) {
+	c := newCatalog("")
+	if c.setupErr != nil || c.client.Transport != nil || c.client.Timeout != 12*time.Second || c.client.CheckRedirect == nil {
+		t.Fatal("empty proxy changed existing client defaults")
+	}
+	for _, raw := range []string{"http://127.0.0.1:7891", "https://proxy.example:443", "http://[::1]:7891"} {
+		client, err := catalogClient(raw)
+		if err != nil {
+			t.Fatalf("rejected valid proxy: %v", err)
+		}
+		transport, ok := client.Transport.(*http.Transport)
+		if !ok || transport.Proxy == nil || client.Timeout != 12*time.Second || client.CheckRedirect == nil {
+			t.Fatal("proxy changed request bounds")
+		}
+		req, _ := http.NewRequest(http.MethodGet, "https://coverartarchive.org/", nil)
+		selected, err := transport.Proxy(req)
+		if err != nil || selected.String() != raw {
+			t.Fatal("dedicated proxy was not selected")
+		}
+		transport.CloseIdleConnections()
 	}
 }

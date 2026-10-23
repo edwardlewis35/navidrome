@@ -36,4 +36,10 @@
 
 备份数据库时应同时保留数据目录中的 `artwork`。外部图片的可用性和元信息匹配质量由提供方决定。
 
+## 可选封面代理
+
+服务器配置项 `OnlineCoverProxy`（环境变量 `ND_ONLINECOVERPROXY`）默认为空，保持原有 HTTP 客户端行为。需要独立代理时，可以设置 `ND_ONLINECOVERPROXY=http://proxy.example:7891`，重启服务后生效。仅支持带显式端口的 `http://主机:端口` 或 `https://主机:端口`；不接受用户名、密码、路径、查询参数或片段。
+
+该配置只用于服务器向 MusicBrainz、Cover Art Archive 及其允许的 Archive 图片地址发送的封面请求，不影响 AI、GitHub、音乐播放或其他 HTTP 客户端，也不会修改系统代理。浏览器直接加载候选预览图时使用浏览器自身网络。代理配置无效或不可达时，封面请求返回 502，不会静默绕过该代理。已有下载超时、跳转域名、并发和图片大小限制继续生效；调试配置日志不会输出该项原始值。
+
 提供方文档：[MusicBrainz 搜索](https://musicbrainz.org/doc/MusicBrainz_API/Search/ReleaseSearch)、[访问频率](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)、[Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive/API)。

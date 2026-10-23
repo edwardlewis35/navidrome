@@ -77,6 +77,34 @@ var _ = Describe("Configuration", func() {
 		})
 	})
 
+	Describe("online cover proxy", func() {
+		It("is empty by default and can be configured independently", func() {
+			conf.Load(true)
+			Expect(conf.Server.OnlineCoverProxy).To(BeEmpty())
+			viper.Set("onlinecoverproxy", "http://proxy.example:7891")
+			conf.Load(true)
+			Expect(conf.Server.OnlineCoverProxy).To(Equal("http://proxy.example:7891"))
+		})
+
+		It("never includes its raw value in the debug configuration dump", func() {
+			logFile := filepath.Join(GinkgoT().TempDir(), "configuration.log")
+			proxy := "http://private-user:private-password@proxy.example:7891"
+			viper.Set("logfile", logFile)
+			viper.Set("loglevel", "debug")
+			viper.Set("enablelogredacting", false)
+			viper.Set("onlinecoverproxy", proxy)
+			DeferCleanup(log.SetOutput, os.Stderr)
+			conf.Load(false)
+			content, err := os.ReadFile(logFile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(ContainSubstring("[configured]"))
+			Expect(string(content)).ToNot(ContainSubstring(proxy))
+			Expect(string(content)).ToNot(ContainSubstring("private-user"))
+			Expect(string(content)).ToNot(ContainSubstring("private-password"))
+			Expect(conf.Server.OnlineCoverProxy).To(Equal(proxy))
+		})
+	})
+
 	Describe("ValidateURL", func() {
 		It("accepts a valid http URL", func() {
 			fn := conf.ValidateURL("TestOption", "http://example.com/path")

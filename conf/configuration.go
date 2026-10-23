@@ -81,6 +81,7 @@ type configOptions struct {
 	MPVCmdTemplate                  string
 	CoverArtPriority                string
 	CoverArtQuality                 int
+	OnlineCoverProxy                string
 	EnableWebPEncoding              bool
 	ArtistArtPriority               string
 	ArtistImageFolder               string
@@ -487,7 +488,7 @@ func Load(noConfigDump bool) {
 
 	// Print current configuration if log level is Debug
 	if log.IsGreaterOrEqualTo(log.LevelDebug) && !noConfigDump {
-		prettyConf := pretty.Sprintf("Configuration: %# v", Server)
+		prettyConf := redactedConfigDump()
 		if Server.EnableLogRedacting {
 			prettyConf = log.Redact(prettyConf)
 		}
@@ -532,6 +533,22 @@ func Load(noConfigDump bool) {
 	for _, hook := range hooks {
 		hook()
 	}
+}
+
+func redactedConfigDump() string {
+	const unavailable = "Configuration: unable to prepare redacted configuration"
+	data, err := json.Marshal(Server)
+	if err != nil {
+		return unavailable
+	}
+	var debugConfig configOptions
+	if err := json.Unmarshal(data, &debugConfig); err != nil {
+		return unavailable
+	}
+	if debugConfig.OnlineCoverProxy != "" {
+		debugConfig.OnlineCoverProxy = "[configured]"
+	}
+	return pretty.Sprintf("Configuration: %# v", &debugConfig)
 }
 
 // deprecatedOptions still work, but will be removed in a future release. An empty
@@ -1017,6 +1034,7 @@ func setViperDefaults() {
 	viper.SetDefault("mpvcmdtemplate", "mpv --audio-device=%d --no-audio-display %f --input-ipc-server=%s")
 	viper.SetDefault("coverartpriority", "cover.*, folder.*, front.*, embedded, external")
 	viper.SetDefault("coverartquality", 75)
+	viper.SetDefault("onlinecoverproxy", "")
 	viper.SetDefault("enablewebpencoding", false)
 	viper.SetDefault("artistartpriority", "artist.*, album/artist.*, external")
 	viper.SetDefault("artistimagefolder", "")

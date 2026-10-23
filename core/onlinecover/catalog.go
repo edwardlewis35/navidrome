@@ -13,11 +13,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/navidrome/navidrome/conf"
 	_ "golang.org/x/image/webp"
 )
 
@@ -40,6 +42,7 @@ type Candidate struct {
 
 type Catalog struct {
 	client      *http.Client
+	setupErr    error
 	musicBrainz string
 	archive     string
 	mu          sync.Mutex
@@ -50,7 +53,41 @@ type Catalog struct {
 }
 
 func NewCatalog() *Catalog {
-	return &Catalog{client: &http.Client{Timeout: 12 * time.Second, CheckRedirect: coverRedirect}, musicBrainz: "https://musicbrainz.org", archive: "https://coverartarchive.org", searches: make(chan struct{}, 2), frontChecks: make(chan struct{}, 3), downloads: make(chan struct{}, 2)}
+	return newCatalog(conf.Server.OnlineCoverProxy)
+}
+
+func newCatalog(proxy string) *Catalog {
+	client, err := catalogClient(proxy)
+	return &Catalog{client: client, setupErr: err, musicBrainz: "https://musicbrainz.org", archive: "https://coverartarchive.org", searches: make(chan struct{}, 2), frontChecks: make(chan struct{}, 3), downloads: make(chan struct{}, 2)}
+}
+
+// A configured proxy belongs to this catalogue only. Never change the shared
+// transport or fall back to direct requests when its configuration is invalid.
+func catalogClient(proxy string) (*http.Client, error) {
+	client := &http.Client{Timeout: 12 * time.Second, CheckRedirect: coverRedirect}
+	if proxy == "" {
+		return client, nil
+	}
+	proxyURL, err := url.Parse(proxy)
+	if err != nil || strings.Contains(proxy, "#") || !validProxyURL(proxyURL) {
+		return client, fmt.Errorf("%w: invalid online cover proxy configuration", ErrUnavailable)
+	}
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return client, fmt.Errorf("%w: online cover transport is unavailable", ErrUnavailable)
+	}
+	transport := base.Clone()
+	transport.Proxy = http.ProxyURL(proxyURL)
+	client.Transport = transport
+	return client, nil
+}
+
+func validProxyURL(u *url.URL) bool {
+	if u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Opaque != "" || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return false
+	}
+	port, err := strconv.Atoi(u.Port())
+	return err == nil && port > 0 && port <= 65535
 }
 
 func coverRedirect(req *http.Request, previous []*http.Request) error {
@@ -84,6 +121,9 @@ func (c *Catalog) reserveSearch(ctx context.Context) error {
 }
 
 func (c *Catalog) get(ctx context.Context, target string, limit int64) ([]byte, error) {
+	if c.setupErr != nil {
+		return nil, c.setupErr
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, err
@@ -156,6 +196,9 @@ type catalogRelease struct {
 
 // Search sends names only. Clients cannot supply provider URLs or filesystem paths.
 func (c *Catalog) Search(ctx context.Context, query, releaseID string) ([]Candidate, error) {
+	if c.setupErr != nil {
+		return nil, c.setupErr
+	}
 	select {
 	case c.searches <- struct{}{}:
 		defer func() { <-c.searches }()
@@ -271,6 +314,9 @@ func (c *Catalog) candidateForRelease(release catalogRelease) Candidate {
 
 // Download accepts a catalogue release ID only and re-encodes a bounded image.
 func (c *Catalog) Download(ctx context.Context, releaseID string) ([]byte, error) {
+	if c.setupErr != nil {
+		return nil, c.setupErr
+	}
 	if !ValidReleaseID(releaseID) {
 		return nil, ErrInvalidSelection
 	}

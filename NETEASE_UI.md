@@ -56,6 +56,8 @@ docker compose -f docker-compose.netease.yml up -d
 
 管理员可以保存歌曲和专辑封面；歌单所有者在允许上传封面时也可以设置自己的歌单封面。封面保存在数据目录，不修改音频标签。备份时应保留 `artwork` 目录。
 
+网络受限时，可设置可选环境变量 `ND_ONLINECOVERPROXY=http://proxy.example:7891` 并重启服务。默认留空；只代理服务器的在线封面搜索和下载，不改变 AI 或播放请求的网络。代理只支持不带认证、路径、参数或片段且有显式端口的 HTTP/HTTPS 地址，配置错误时会提示封面服务不可用。完整限制见 [ONLINE_COVER_API.md](ONLINE_COVER_API.md)。
+
 ## 精简入口和客户端兼容
 
 移除网页中的网络电台、Last.fm 和插件入口，默认关闭 Last.fm 与插件运行；关于页面显示当前版本、服务信息和本分支链接。搜索框与侧栏留有独立间距，歌单子项按当前歌单同步高亮。
