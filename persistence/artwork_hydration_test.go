@@ -243,6 +243,50 @@ var _ = Describe("Artwork hydration", func() {
 			conf.Server.EnableMediaFileCoverArt = true
 		})
 
+		It("hydrates an explicitly selected song cover without embedded art even when extraction is disabled", func() {
+			conf.Server.EnableMediaFileCoverArt = false
+			setCover("1001", false)
+			putInfo("al", "101", "albumonly11111111")
+			Expect(aw.PutItemArtwork(ctx, &model.ItemArtwork{
+				ItemKind: "mf", ItemID: "1001", ImageType: model.ImageTypePrimary,
+				Hash: "customcover11111", Source: "upload",
+			})).To(Succeed())
+			got, err := repo.Get(ctx, "1001")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(got.HasCoverArt).To(BeFalse())
+			Expect(got.CustomCover).To(BeTrue())
+			Expect(got.ImageHash).To(Equal("customcover11111"))
+			Expect(got.CoverArtID().Kind).To(Equal(model.KindMediaFileArtwork))
+			Expect(got.CoverArtID().ID).To(Equal("1001"))
+			byID := getByID()
+			Expect(byID["1001"].CustomCover).To(BeTrue())
+			Expect(byID["1001"].ImageHash).To(Equal("customcover11111"))
+			matches, err := repo.Search(ctx, "A Day In A Life", model.QueryOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(matches).ToNot(BeEmpty())
+			Expect(matches[0].CustomCover).To(BeTrue())
+			Expect(matches[0].ImageHash).To(Equal("customcover11111"))
+		})
+
+		It("does not mistake embedded artwork or an absent upload for an explicit cover", func() {
+			conf.Server.EnableMediaFileCoverArt = false
+			putInfo("al", "101", "albumonly11111111")
+			Expect(aw.PutItemArtwork(ctx, &model.ItemArtwork{
+				ItemKind: "mf", ItemID: "1001", ImageType: model.ImageTypePrimary,
+				Hash: "embeddedonly1111", Source: "embedded",
+			})).To(Succeed())
+			got, err := repo.Get(ctx, "1001")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(got.CustomCover).To(BeFalse())
+			Expect(got.ImageHash).To(Equal("albumonly11111111"))
+			Expect(aw.PutItemArtwork(ctx, &model.ItemArtwork{
+				ItemKind: "mf", ItemID: "1001", ImageType: model.ImageTypePrimary, Source: "upload",
+			})).To(Succeed())
+			got, err = repo.Get(ctx, "1001")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(got.CustomCover).To(BeFalse())
+		})
+
 		It("resolves the embedded-eligible fallback matrix", func() {
 			setCover("1001", true) // eligible, own hash
 			setCover("1002", true) // eligible, but embedded art absent -> album

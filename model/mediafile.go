@@ -100,11 +100,12 @@ type MediaFile struct {
 	Tags         Tags         `structs:"tags" json:"tags,omitempty" hash:"ignore"`       // All imported tags from the original file
 	Participants Participants `structs:"participants" json:"participants" hash:"ignore"` // All artists that participated in this track
 
-	Trashed   bool      `structs:"trashed" json:"-" hash:"ignore"`            // Retain metadata while the original file is in the administrator's trash
-	Missing   bool      `structs:"missing" json:"missing" hash:"ignore"`      // If the file is not found in the library's FS
-	BirthTime time.Time `structs:"birth_time" json:"birthTime" hash:"ignore"` // Time of file creation (ctime)
-	CreatedAt time.Time `structs:"created_at" json:"createdAt" hash:"ignore"` // Time this entry was created in the DB
-	UpdatedAt time.Time `structs:"updated_at" json:"updatedAt" hash:"ignore"` // Time of file last update (mtime)
+	CustomCover bool      `structs:"-" json:"customCover,omitempty" hash:"ignore"` // Hydrated from an explicitly selected cover, never written into audio tags.
+	Trashed     bool      `structs:"trashed" json:"-" hash:"ignore"`               // Retain metadata while the original file is in the administrator's trash
+	Missing     bool      `structs:"missing" json:"missing" hash:"ignore"`         // If the file is not found in the library's FS
+	BirthTime   time.Time `structs:"birth_time" json:"birthTime" hash:"ignore"`    // Time of file creation (ctime)
+	CreatedAt   time.Time `structs:"created_at" json:"createdAt" hash:"ignore"`    // Time this entry was created in the DB
+	UpdatedAt   time.Time `structs:"updated_at" json:"updatedAt" hash:"ignore"`    // Time of file last update (mtime)
 }
 
 func (mf MediaFile) FullTitle() string {
@@ -137,7 +138,7 @@ func (mf MediaFile) ContentType() string {
 
 func (mf MediaFile) CoverArtID() ArtworkID {
 	// If it has a cover art, return it (if feature is disabled, skip)
-	if mf.HasCoverArt && conf.Server.EnableMediaFileCoverArt {
+	if mf.CustomCover || (mf.HasCoverArt && conf.Server.EnableMediaFileCoverArt) {
 		return artworkIDFromMediaFile(mf)
 	}
 	// Otherwise fallback to disc (if available) or album cover

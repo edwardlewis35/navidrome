@@ -9,7 +9,6 @@ import {
   MusicNoteOutlined,
   FavoriteBorder,
   History,
-  RadioOutlined,
   QueueMusic,
   Tune,
   ShareOutlined,
@@ -19,6 +18,7 @@ import PlaylistsSubMenu from './PlaylistsSubMenu'
 import useMusicText from './useMusicText'
 import config from '../config'
 import TrashMenuItem from '../trash/TrashMenuItem'
+import AdminMusicMenuItems from './AdminMusicMenuItems'
 
 const useStyles = makeStyles({
   root: {
@@ -81,12 +81,11 @@ export default function MusicMenu() {
       {item('/album/all', text.albums, <AlbumOutlined />, true)}
       {item('/artist', text.artists, <PersonOutline />)}
       {item('/song', text.songs, <MusicNoteOutlined />)}
-      {item('/radio', text.radio, <RadioOutlined />)}
       {open && <p className={classes.caption}>{text.personal}</p>}
       {config.enableFavourites &&
         item('/album/starred', text.favourites, <FavoriteBorder />)}
       {item('/album/recentlyPlayed', text.recentlyPlayed, <History />)}
-      {item('/playlist', text.playlists, <QueueMusic />)}
+      {item('/playlist', text.playlists, <QueueMusic />, true)}
       {config.enableSharing && item('/share', text.shares, <ShareOutlined />)}
       <Divider />
       {open && <LibrarySelector />}
@@ -98,6 +97,10 @@ export default function MusicMenu() {
         />
       )}
       {item('/personal', text.preferences, <Tune />)}
+      <AdminMusicMenuItems
+        sidebarIsOpen={open}
+        activeClassName={classes.active}
+      />
       <TrashMenuItem sidebarIsOpen={open} activeClassName={classes.active} />
       {open && <p className={classes.footer}>NAVIDROME · {text.online}</p>}
     </nav>

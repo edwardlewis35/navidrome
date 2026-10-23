@@ -8,6 +8,7 @@ import { AddToPlaylistButton } from './AddToPlaylistButton'
 import { makeStyles } from '@material-ui/core/styles'
 import { BatchShareButton } from './BatchShareButton'
 import config from '../config'
+import { SongManagementButtons } from './SongManagementButtons'
 
 const useStyles = makeStyles((theme) => ({
   button: {
@@ -48,6 +49,7 @@ export const SongBulkActions = (props) => {
         <BatchShareButton {...props} className={classes.button} />
       )}
       <AddToPlaylistButton {...props} className={classes.button} />
+      <SongManagementButtons {...props} className={classes.button} />
     </Fragment>
   )
 }

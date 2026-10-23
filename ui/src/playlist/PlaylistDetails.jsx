@@ -15,6 +15,7 @@ import {
 } from '../common'
 import subsonic from '../subsonic'
 import { Artwork } from '../common/Artwork'
+import OnlineCoverButton from '../covers/OnlineCoverButton'
 
 const useStyles = makeStyles(
   (theme) => ({
@@ -159,6 +160,7 @@ const PlaylistDetails = (props) => {
               )}
             </Typography>
             <CollapsibleComment record={record} />
+            <OnlineCoverButton kind="playlist" record={record} />
           </CardContent>
         </div>
       </div>

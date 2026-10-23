@@ -1,6 +1,9 @@
 import jsonServerProvider from 'ra-data-json-server'
 import httpClient from './httpClient'
 import { REST_URL } from '../consts'
+import { createAIDataProvider } from './aiDataProvider'
+import { createSongManagementProvider } from './songManagementProvider'
+import { createOnlineCoverProvider } from './onlineCoverProvider'
 
 const dataProvider = jsonServerProvider(REST_URL, httpClient)
 
@@ -156,6 +159,9 @@ const createPlayer = async (resource, params) => {
 
 const wrapperDataProvider = {
   ...dataProvider,
+  ...createAIDataProvider(httpClient),
+  ...createSongManagementProvider(httpClient),
+  ...createOnlineCoverProvider(httpClient),
   getList: (resource, params) => {
     const [r, p] = mapResource(resource, params)
     return dataProvider.getList(r, p)

@@ -160,6 +160,7 @@ func (r *artworkRepository) GetInfoForItems(ctx context.Context, kind model.Kind
 	res := map[string]model.ItemArtworkInfo{}
 	for chunk := range slices.Chunk(ids, artworkBatchSize) {
 		sel := Select("ia.item_id", "ia.hash", "COALESCE(a.blur_hash, '') as blur_hash",
+			"CASE WHEN ia.item_kind = 'mf' AND ia.source = 'upload' AND ia.hash != '' THEN 1 ELSE 0 END AS custom_cover",
 			"COALESCE(a.thumb_hash, '') as thumb_hash",
 			"COALESCE(a.dominant_color, '') as dominant_color",
 			"COALESCE(a.width, 0) as width", "COALESCE(a.height, 0) as height").

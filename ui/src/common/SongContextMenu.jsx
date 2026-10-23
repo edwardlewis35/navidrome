@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { useDispatch } from 'react-redux'
 import {
@@ -41,6 +41,7 @@ import { playSimilar } from './playbackActions.js'
 import { formatBytes } from '../utils'
 import { useRedirect } from 'react-admin'
 import { trashErrorMessage } from '../trash/trashErrorMessage'
+import OnlineCoverDialog from '../covers/OnlineCoverDialog'
 
 const useStyles = makeStyles({
   noWrap: {
@@ -89,8 +90,17 @@ export const SongContextMenu = ({
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashing, setTrashing] = useState(false)
   const [trashError, setTrashError] = useState('')
+  const [trashMode, setTrashMode] = useState('trash')
+  const trashInFlight = useRef(false)
+  const [coverOpen, setCoverOpen] = useState(false)
 
   const options = {
+    matchCover: {
+      enabled:
+        permissions === 'admin' && !permissionsLoading && !record.missing,
+      label: translate('resources.musicManagement.matchCover'),
+      action: () => setCoverOpen(true),
+    },
     playNow: {
       enabled: true,
       label: translate('resources.song.actions.playNow'),
@@ -196,25 +206,64 @@ export const SongContextMenu = ({
       label: translate('resources.trash.moveToTrash'),
       action: () => {
         setTrashError('')
+        setTrashMode('trash')
+        setTrashOpen(true)
+      },
+    },
+    permanentlyDelete: {
+      enabled:
+        permissions === 'admin' &&
+        !permissionsLoading &&
+        Boolean(record.mediaFileId || record.id) &&
+        !record.missing,
+      label: translate('resources.musicManagement.deleteOne'),
+      action: () => {
+        setTrashError('')
+        setTrashMode('permanent')
         setTrashOpen(true)
       },
     },
   }
 
   const confirmTrash = async () => {
-    if (permissions !== 'admin' || permissionsLoading || trashing) return
+    if (permissions !== 'admin' || permissionsLoading || trashInFlight.current)
+      return
+    trashInFlight.current = true
     setTrashing(true)
     setTrashError('')
     try {
-      await dataProvider.moveSongToTrash(record.mediaFileId || record.id)
+      if (trashMode === 'permanent') {
+        const { data } = await dataProvider.manageSongs(
+          [record.mediaFileId || record.id],
+          'permanent',
+        )
+        notify(
+          translate(
+            data.completed === 1
+              ? 'resources.musicManagement.deleted'
+              : data.results?.[0]?.status === 'pending'
+                ? 'resources.musicManagement.pending'
+                : 'resources.musicManagement.failed',
+          ),
+          {
+            type: data.completed === 1 ? 'info' : 'warning',
+            multiLine: true,
+            duration: 10000,
+          },
+        )
+      } else {
+        await dataProvider.moveSongToTrash(record.mediaFileId || record.id)
+        notify(translate('resources.trash.moved'), { type: 'info' })
+      }
       setTrashOpen(false)
-      notify(translate('resources.trash.moved'), { type: 'info' })
       refresh()
     } catch (error) {
       setTrashError(
         trashErrorMessage(error, translate('resources.trash.moveFailed')),
       )
+      if (trashMode === 'permanent') refresh()
     } finally {
+      trashInFlight.current = false
       setTrashing(false)
     }
   }
@@ -289,6 +338,15 @@ export const SongContextMenu = ({
 
   return (
     <span className={clsx(classes.noWrap, className)}>
+      {coverOpen && permissions === 'admin' && (
+        <OnlineCoverDialog
+          kind="song"
+          id={record.mediaFileId || record.id}
+          initialQuery={record.album || record.title}
+          open={coverOpen}
+          onClose={() => setCoverOpen(false)}
+        />
+      )}
       <LoveButton
         record={record}
         resource={resource}
@@ -310,7 +368,9 @@ export const SongContextMenu = ({
                 value={key}
                 key={key}
                 className={
-                  key === 'moveToTrash' ? classes.destructive : undefined
+                  key === 'moveToTrash' || key === 'permanentlyDelete'
+                    ? classes.destructive
+                    : undefined
                 }
                 onClick={
                   showInPlaylistDisabled
@@ -339,12 +399,20 @@ export const SongContextMenu = ({
           maxWidth="xs"
         >
           <DialogTitle id={`trash-song-${record.id}`}>
-            {translate('resources.trash.confirmTitle')}
+            {translate(
+              trashMode === 'permanent'
+                ? 'resources.musicManagement.permanentOneTitle'
+                : 'resources.trash.confirmTitle',
+            )}
           </DialogTitle>
           <DialogContent>
             <Typography gutterBottom>{record.title || record.path}</Typography>
             <DialogContentText>
-              {translate('resources.trash.confirmDescription')}
+              {translate(
+                trashMode === 'permanent'
+                  ? 'resources.musicManagement.permanentOneDescription'
+                  : 'resources.trash.confirmDescription',
+              )}
             </DialogContentText>
             {trashError && (
               <Typography role="alert" color="error">
@@ -362,7 +430,11 @@ export const SongContextMenu = ({
               onClick={confirmTrash}
               startIcon={trashing ? <CircularProgress size={16} /> : undefined}
             >
-              {translate('resources.trash.moveToTrash')}
+              {translate(
+                trashMode === 'permanent'
+                  ? 'resources.musicManagement.deleteOne'
+                  : 'resources.trash.moveToTrash',
+              )}
             </Button>
           </DialogActions>
         </Dialog>

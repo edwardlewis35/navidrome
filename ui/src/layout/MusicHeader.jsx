@@ -11,6 +11,7 @@ const useStyles = makeStyles((theme) => ({
     gap: 24,
     flex: 1,
     minWidth: 0,
+    overflow: 'hidden',
   },
   brand: {
     color: 'inherit',
@@ -22,6 +23,7 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 700,
     letterSpacing: '-0.7px',
     minWidth: 166,
+    flexShrink: 0,
   },
   mark: {
     border: '2px solid currentColor',
@@ -36,11 +38,20 @@ const useStyles = makeStyles((theme) => ({
     background: 'rgba(255,255,255,.17)',
     padding: '0 8px 0 16px',
     width: 290,
+    maxWidth: '100%',
+    minWidth: 0,
+    flexShrink: 1,
+    boxSizing: 'border-box',
     height: 36,
     '& input': { color: '#fff', fontSize: 13 },
     '& input::placeholder': { opacity: 0.8, color: '#fff' },
   },
-  back: { color: 'inherit', background: 'rgba(0,0,0,.06)', padding: 4 },
+  back: {
+    color: 'inherit',
+    background: 'rgba(0,0,0,.06)',
+    padding: 4,
+    flexShrink: 0,
+  },
   submit: { color: 'inherit', padding: 6 },
   [theme.breakpoints.down('sm')]: {
     root: { gap: 12 },
@@ -52,7 +63,7 @@ const useStyles = makeStyles((theme) => ({
     root: { gap: 8 },
     brand: { '& span': { display: 'none' } },
     mark: { fontSize: 27 },
-    search: { width: '100%', maxWidth: 220 },
+    search: { flex: 1, width: 'auto', maxWidth: 220 },
   },
 }))
 

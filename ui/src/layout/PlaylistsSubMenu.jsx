@@ -9,7 +9,7 @@ import {
 } from 'react-admin'
 import { useHistory } from 'react-router-dom'
 import QueueMusicIcon from '@material-ui/icons/QueueMusic'
-import { Typography } from '@material-ui/core'
+import { Typography, makeStyles } from '@material-ui/core'
 import QueueMusicOutlinedIcon from '@material-ui/icons/QueueMusicOutlined'
 import FavoriteIcon from '@material-ui/icons/Favorite'
 import FavoriteBorderIcon from '@material-ui/icons/FavoriteBorder'
@@ -21,7 +21,19 @@ import { DraggableTypes } from '../consts'
 import { setSidebarPlaylistsOnlyFavourites } from '../actions'
 import config from '../config'
 
+const useStyles = makeStyles((theme) => ({
+  active: {
+    '&&': {
+      color: theme.palette.primary.main,
+      backgroundColor: theme.palette.action.selected,
+      fontWeight: 600,
+    },
+  },
+}))
+
 const PlaylistMenuItemLink = ({ pls, sidebarIsOpen }) => {
+  const classes = useStyles()
+  const playlistPath = `/playlist/${encodeURIComponent(pls.id)}`
   const dataProvider = useDataProvider()
   const notify = useNotify()
 
@@ -42,7 +54,12 @@ const PlaylistMenuItemLink = ({ pls, sidebarIsOpen }) => {
 
   return (
     <MenuItemLink
-      to={`/playlist/${pls.id}/show`}
+      to={`${playlistPath}/show`}
+      activeClassName={classes.active}
+      isActive={(_, location) =>
+        location.pathname === playlistPath ||
+        location.pathname.startsWith(`${playlistPath}/`)
+      }
       primaryText={
         <OverflowTooltip title={pls.name} placement="right">
           <Typography variant="inherit" noWrap ref={dropRef}>

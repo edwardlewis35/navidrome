@@ -14,6 +14,7 @@ import { Artwork } from '../common/Artwork'
 import { PlayButton } from '../common/PlayButton'
 import { useRefreshOnEvents } from '../common/useRefreshOnEvents'
 import useMusicText from './useMusicText'
+import AIRecommendations from '../ai/AIRecommendations'
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -425,6 +426,7 @@ function MusicDiscovery() {
           </Button>
         </section>
       </div>
+      <AIRecommendations />
       <AlbumSection
         title={text.recommended}
         subtitle={text.subtitle}

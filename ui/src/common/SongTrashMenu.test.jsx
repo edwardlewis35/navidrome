@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   move: vi.fn(),
   notify: vi.fn(),
   refresh: vi.fn(),
-  provider: { getPlaylists: vi.fn() },
+  provider: { getPlaylists: vi.fn(), manageSongs: vi.fn() },
 }))
 
 vi.mock('react-redux', () => ({ useDispatch: () => vi.fn() }))
@@ -58,6 +58,9 @@ describe('administrator song trash action', () => {
     mocks.locale = 'en'
     mocks.provider.getPlaylists.mockResolvedValue({ data: [] })
     mocks.move.mockResolvedValue({ data: { id: song.id, trashId: 'trash-1' } })
+    mocks.provider.manageSongs.mockResolvedValue({
+      data: { completed: 1, failed: 0, results: [{ status: 'deleted' }] },
+    })
   })
 
   it.each(['regular', undefined])(
@@ -135,6 +138,32 @@ describe('administrator song trash action', () => {
     )
     await waitFor(() => expect(mocks.move).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce())
+  })
+
+  it('permanently deletes the underlying song only after irreversible confirmation', async () => {
+    render(
+      <SongContextMenu
+        record={{ ...song, id: 'playlist-position', mediaFileId: 'real-song' }}
+      />,
+    )
+    openMenu()
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Permanently delete song' }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/cannot be undone/)).toBeInTheDocument()
+    expect(mocks.provider.manageSongs).not.toHaveBeenCalled()
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Permanently delete song' }),
+    )
+    await waitFor(() =>
+      expect(mocks.provider.manageSongs).toHaveBeenCalledWith(
+        ['real-song'],
+        'permanent',
+      ),
+    )
+    expect(mocks.move).not.toHaveBeenCalled()
+    expect(mocks.refresh).toHaveBeenCalledOnce()
   })
 
   it('localizes the action and confirmation for Chinese', async () => {

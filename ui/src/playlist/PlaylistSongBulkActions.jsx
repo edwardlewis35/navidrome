@@ -6,12 +6,14 @@ import {
 } from 'react-admin'
 import { MdOutlinePlaylistRemove } from 'react-icons/md'
 import PropTypes from 'prop-types'
+import { SongManagementButtons } from '../common/SongManagementButtons'
 
 // Replace original resource with "fake" one for removing tracks from playlist
 const PlaylistSongBulkActions = ({
   playlistId,
   resource,
   onUnselectItems,
+  readOnly,
   ...rest
 }) => {
   const unselectAll = useUnselectAll()
@@ -23,12 +25,19 @@ const PlaylistSongBulkActions = ({
   return (
     <ResourceContextProvider value={mappedResource}>
       <Fragment>
-        <BulkDeleteButton
+        {!readOnly && (
+          <BulkDeleteButton
+            {...rest}
+            label={'ra.action.remove'}
+            icon={<MdOutlinePlaylistRemove />}
+            resource={mappedResource}
+            onClick={onUnselectItems}
+          />
+        )}
+        <SongManagementButtons
           {...rest}
-          label={'ra.action.remove'}
-          icon={<MdOutlinePlaylistRemove />}
-          resource={mappedResource}
-          onClick={onUnselectItems}
+          resource="playlistTrack"
+          onUnselectItems={onUnselectItems}
         />
       </Fragment>
     </ResourceContextProvider>

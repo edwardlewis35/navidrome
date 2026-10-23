@@ -36,6 +36,7 @@ import { useDateLocale } from '../i18n/useDateLocale'
 import { formatFullDate, intersperse } from '../utils'
 import AlbumExternalLinks from './AlbumExternalLinks'
 import { SafeHTML } from '../common/SafeHTML'
+import OnlineCoverButton from '../covers/OnlineCoverButton'
 
 const useStyles = makeStyles(
   (theme) => ({
@@ -307,6 +308,7 @@ const AlbumDetails = (props) => {
             ) : (
               <Typography component={'p'}>{record.genre}</Typography>
             )}
+            <OnlineCoverButton kind="album" record={record} />
             {!isXsmall && (
               <Typography component={'div'} className={classes.recordMeta}>
                 {config.enableExternalServices && (

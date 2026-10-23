@@ -12,6 +12,7 @@ import PlaylistsSubMenu from './PlaylistsSubMenu'
 import LibrarySelector from '../common/LibrarySelector'
 import config from '../config'
 import TrashMenuItem from '../trash/TrashMenuItem'
+import AdminMusicMenuItems from './AdminMusicMenuItems'
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -75,6 +76,7 @@ const Menu = ({ dense = false }) => {
       key={resource.name}
       to={`/${resource.name}`}
       activeClassName={classes.active}
+      exact={resource.name === 'playlist'}
       primaryText={translatedResourceName(resource, translate)}
       leftIcon={resource.icon || <ViewListIcon />}
       sidebarIsOpen={open}
@@ -145,6 +147,11 @@ const Menu = ({ dense = false }) => {
       ) : (
         resources.filter(subItems('playlist')).map(renderResourceMenuItemLink)
       )}
+      <AdminMusicMenuItems
+        sidebarIsOpen={open}
+        activeClassName={classes.active}
+        dense={dense}
+      />
       <TrashMenuItem
         sidebarIsOpen={open}
         activeClassName={classes.active}

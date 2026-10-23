@@ -21,6 +21,9 @@ vi.mock('react-admin', () => ({
   useQueryWithStore: (query) => mocks.query(query),
   useDataProvider: () => ({ getList: mocks.getList }),
 }))
+vi.mock('../ai/AIRecommendations', () => ({
+  default: () => <section aria-label="AI music" />,
+}))
 vi.mock('react-redux', () => ({
   useSelector: (selector) => selector(mocks.state),
   useDispatch: () => mocks.dispatch,

@@ -28,7 +28,7 @@ export const playerInputs = () =>
       choices={BITRATE_CHOICES}
     />,
     <BooleanInput key="reportRealPath" source="reportRealPath" fullWidth />,
-    (config.lastFMEnabled || config.listenBrainzEnabled) && (
+    config.listenBrainzEnabled && (
       <BooleanInput key="scrobbleEnabled" source="scrobbleEnabled" fullWidth />
     ),
   ].filter(Boolean)

@@ -140,8 +140,13 @@ export default {
       },
     },
     RaLayout: {
+      root: { minWidth: 0 },
       appFrame: { marginTop: '64px !important' },
-      content: { backgroundColor: '#fff', padding: '0 !important' },
+      content: {
+        backgroundColor: '#fff',
+        padding: '0 !important',
+        minWidth: 0,
+      },
     },
     RaAppBar: {
       toolbar: {
@@ -152,15 +157,71 @@ export default {
       menuButton: { color: 'inherit' },
     },
     RaSidebar: {
-      root: { height: 'calc(100vh - 64px)' },
+      root: { height: 'calc(100vh - 64px)', flexShrink: 0 },
       fixed: { height: 'calc(100vh - 64px)' },
       drawerPaper: {
         backgroundColor: '#f6f6f7',
         borderRight: `1px solid ${line}`,
       },
     },
-    RaList: { content: { borderRadius: 12, backgroundColor: '#fff' } },
-    RaListToolbar: { toolbar: { padding: '8px 16px', minHeight: 64 } },
+    RaList: {
+      main: { minWidth: 0 },
+      content: {
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        minWidth: 0,
+        overflowX: 'auto',
+      },
+    },
+    RaListToolbar: {
+      toolbar: {
+        '&&': {
+          padding: '16px 24px 8px',
+          minHeight: 64,
+          gap: '8px 16px',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          boxSizing: 'border-box',
+          '@media (max-width: 599px)': { padding: '12px 16px 8px' },
+        },
+      },
+      actions: { '&&': { paddingTop: 0, flexWrap: 'wrap' } },
+    },
+    RaBulkActionsToolbar: {
+      toolbar: {
+        height: 'auto',
+        flexWrap: 'wrap',
+        gap: '4px 12px',
+        paddingTop: 8,
+        paddingBottom: 8,
+      },
+      collapsed: { height: 0, paddingTop: 0, paddingBottom: 0 },
+      topToolbar: {
+        '&&': {
+          flexWrap: 'wrap',
+          flex: '1 1 auto',
+          minWidth: 0,
+          maxWidth: '100%',
+          padding: 0,
+          gap: '4px 8px',
+          backgroundColor: 'transparent',
+          '@media (max-width: 599px)': { justifyContent: 'flex-start' },
+        },
+      },
+    },
+    RaFilterForm: {
+      form: {
+        '&&': {
+          marginTop: 0,
+          minHeight: 0,
+          minWidth: 0,
+          maxWidth: '100%',
+          flex: '1 1 auto',
+          '& .filter-field': { minWidth: 0, maxWidth: '100%' },
+          '& .MuiFormControl-root': { maxWidth: '100%' },
+        },
+      },
+    },
     RaSearchInput: {
       input: {
         '& .MuiInputBase-root': {

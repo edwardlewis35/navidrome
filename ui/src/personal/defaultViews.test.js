@@ -25,7 +25,6 @@ describe('defaultViews', () => {
         { id: 'artist', name: 'resources.artist.name:2' },
         { id: 'song', name: 'resources.song.name:2' },
         { id: 'playlist', name: 'resources.playlist.name:2' },
-        { id: 'radio', name: 'resources.radio.name:2' },
       ]),
     )
   })
@@ -34,12 +33,19 @@ describe('defaultViews', () => {
     expect(isResourceDefaultView('artist')).toBe(true)
     expect(isResourceDefaultView('song')).toBe(true)
     expect(isResourceDefaultView('playlist')).toBe(true)
-    expect(isResourceDefaultView('radio')).toBe(true)
+    expect(isResourceDefaultView('radio')).toBe(false)
     expect(isResourceDefaultView('recentlyAdded')).toBe(false)
   })
 
   it('falls back to the default album list when no default view is stored', () => {
     expect(getStoredDefaultView()).toBe(defaultAlbumList)
+  })
+
+  it('ignores the removed radio view and unknown persisted choices', () => {
+    for (const view of ['radio', 'missing-view']) {
+      localStorage.setItem('defaultView', view)
+      expect(getStoredDefaultView()).toBe(defaultAlbumList)
+    }
   })
 
   it('returns the stored default view', () => {

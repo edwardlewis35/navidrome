@@ -6,7 +6,8 @@ import ListItemIcon from '@material-ui/core/ListItemIcon'
 import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction'
 import ListItemText from '@material-ui/core/ListItemText'
 import { makeStyles } from '@material-ui/core/styles'
-import { sanitizeListRestProps } from 'react-admin'
+import { sanitizeListRestProps, useTranslate } from 'react-admin'
+import Checkbox from '@material-ui/core/Checkbox'
 import { DurationField, SongContextMenu, RatingField } from './index'
 import { setTrack } from '../actions'
 import { useDispatch } from 'react-redux'
@@ -64,6 +65,7 @@ export const SongSimpleList = ({
   ...rest
 }) => {
   const dispatch = useDispatch()
+  const translate = useTranslate()
   const classes = useStyles({ classes: classesOverride })
   return (
     (loading || total > 0) && (
@@ -73,6 +75,16 @@ export const SongSimpleList = ({
             data[id] && (
               <span key={id} onClick={() => dispatch(setTrack(data[id]))}>
                 <ListItem className={classes.listItem} button={true}>
+                  {hasBulkActions && onToggleItem && (
+                    <Checkbox
+                      checked={selectedIds.includes(id)}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={() => onToggleItem(id)}
+                      inputProps={{
+                        'aria-label': `${translate('ra.action.select_row')} ${data[id].title}`,
+                      }}
+                    />
+                  )}
                   <ListItemText
                     primary={
                       <div className={classes.title}>{data[id].title}</div>

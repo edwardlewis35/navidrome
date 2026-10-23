@@ -9,6 +9,7 @@ import { processEvent, EVENT_REFRESH_RESOURCE } from '../actions'
 import PlaylistsSubMenu from './PlaylistsSubMenu'
 
 const mockUseQueryWithStore = vi.fn()
+let pathname = '/playlist'
 
 vi.mock('../config', () => ({
   // losslessFormats is read at module-load time by common/QualityInfo.jsx,
@@ -36,7 +37,15 @@ vi.mock('react-admin', async (importOriginal) => {
     useDataProvider: () => ({ addToPlaylist: vi.fn() }),
     useNotify: () => vi.fn(),
     useQueryWithStore: (query) => mockUseQueryWithStore(query),
-    MenuItemLink: ({ primaryText }) => <div>{primaryText}</div>,
+    MenuItemLink: ({ primaryText, to, isActive, activeClassName }) => (
+      <a
+        href={to}
+        data-active={isActive?.(null, { pathname }) ? 'true' : 'false'}
+        data-active-class={activeClassName}
+      >
+        {primaryText}
+      </a>
+    ),
   }
 })
 
@@ -92,6 +101,7 @@ const lastQuery = () =>
 describe('<PlaylistsSubMenu />', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    pathname = '/playlist'
     localStorage.setItem('userId', 'user-1')
     mockUseQueryWithStore.mockReturnValue({ data: playlists, loaded: true })
     // SubMenu uses MUI's useMediaQuery, which needs window.matchMedia in jsdom
@@ -114,6 +124,30 @@ describe('<PlaylistsSubMenu />', () => {
     expect(lastQuery().payload.filter).toBeUndefined()
     expect(screen.getByText('Mine')).not.toBeNull()
     expect(screen.getByText('Theirs')).not.toBeNull()
+  })
+
+  it.each(['/playlist/pl-1/show', '/playlist/pl-1', '/playlist/pl-1/edit'])(
+    'highlights the exact current playlist at %s',
+    (route) => {
+      pathname = route
+      renderMenu()
+      const mine = screen.getByRole('link', { name: 'Mine' })
+      expect(mine).toHaveAttribute('data-active', 'true')
+      expect(mine.getAttribute('data-active-class')).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'Theirs' })).toHaveAttribute(
+        'data-active',
+        'false',
+      )
+    },
+  )
+
+  it('does not select a playlist whose ID is only a prefix', () => {
+    pathname = '/playlist/pl-10/show'
+    renderMenu()
+    expect(screen.getByRole('link', { name: 'Mine' })).toHaveAttribute(
+      'data-active',
+      'false',
+    )
   })
 
   it('adds the starred filter when favourites-only is enabled', () => {

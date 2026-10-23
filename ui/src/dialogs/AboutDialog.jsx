@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import Link from '@material-ui/core/Link'
 import Dialog from '@material-ui/core/Dialog'
-import IconButton from '@material-ui/core/IconButton'
 import TableContainer from '@material-ui/core/TableContainer'
 import Table from '@material-ui/core/Table'
 import TableBody from '@material-ui/core/TableBody'
@@ -10,21 +9,19 @@ import TableRow from '@material-ui/core/TableRow'
 import TableCell from '@material-ui/core/TableCell'
 import Paper from '@material-ui/core/Paper'
 import CloudDownloadIcon from '@material-ui/icons/CloudDownload'
-import FavoriteBorderIcon from '@material-ui/icons/FavoriteBorder'
 import FileCopyIcon from '@material-ui/icons/FileCopy'
 import Button from '@material-ui/core/Button'
-import { humanize, underscore } from 'inflection'
 import { useGetOne, usePermissions, useTranslate, useNotify } from 'react-admin'
 import { Tabs, Tab } from '@material-ui/core'
 import { makeStyles } from '@material-ui/core/styles'
 import config from '../config'
 import { DialogTitle } from './DialogTitle'
 import { DialogContent } from './DialogContent'
-import { INSIGHTS_DOC_URL } from '../consts.js'
 import subsonic from '../subsonic/index.js'
 import { Typography } from '@material-ui/core'
 import TableHead from '@material-ui/core/TableHead'
 import { configToToml, separateAndSortConfigs } from './aboutUtils'
+import useAboutText from './useAboutText'
 
 const useStyles = makeStyles((theme) => ({
   configNameColumn: {
@@ -69,42 +66,26 @@ const useStyles = makeStyles((theme) => ({
   },
 }))
 
-const links = {
-  homepage: 'navidrome.org',
-  reddit: 'reddit.com/r/Navidrome',
-  twitter: 'twitter.com/navidrome',
-  discord: 'discord.gg/xh7j7yF',
-  source: 'github.com/navidrome/navidrome',
-  bugReports: 'github.com/navidrome/navidrome/issues/new/choose',
-  featureRequests: 'github.com/navidrome/navidrome/discussions/new',
-}
+const repositoryURL = 'https://github.com/edwardlewis35/navidrome'
 
 const LinkToVersion = ({ version }) => {
-  if (version === 'dev') {
-    return <>{version}</>
-  }
-
-  const parts = version.split(' ')
-  const commitID = parts[1].replace(/[()]/g, '')
-  const isSnapshot = version.includes('SNAPSHOT')
-  const url = isSnapshot
-    ? `https://github.com/navidrome/navidrome/compare/v${
-        parts[0].split('-')[0]
-      }...${commitID}`
-    : `https://github.com/navidrome/navidrome/releases/tag/v${parts[0]}`
+  // Custom image versions can be plain labels or include a Git commit.
+  const commit = version?.match(/\(([0-9a-f]{7,40})\)/i)?.[1]
+  if (!commit) return <>{version || '—'}</>
   return (
-    <>
-      <Link href={url} target="_blank" rel="noopener noreferrer">
-        {parts[0]}
-      </Link>
-      {' (' + commitID + ')'}
-    </>
+    <Link
+      href={`${repositoryURL}/commit/${commit}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {version}
+    </Link>
   )
 }
 
 const ShowVersion = ({ uiVersion, serverVersion }) => {
   const translate = useTranslate()
-  const showRefresh = uiVersion !== serverVersion
+  const showRefresh = Boolean(serverVersion) && uiVersion !== serverVersion
 
   return (
     <>
@@ -139,82 +120,51 @@ const ShowVersion = ({ uiVersion, serverVersion }) => {
   )
 }
 
-const AboutTabContent = ({
-  uiVersion,
-  serverVersion,
-  insightsData,
-  loading,
-  permissions,
-}) => {
-  const translate = useTranslate()
-
-  const lastRun = !loading && insightsData?.lastRun
-  let insightsStatus = 'N/A'
-  if (lastRun === 'disabled') {
-    insightsStatus = translate('about.links.insights.disabled')
-  } else if (lastRun && lastRun?.startsWith('1969-12-31')) {
-    insightsStatus = translate('about.links.insights.waiting')
-  } else if (lastRun) {
-    insightsStatus = lastRun
-  }
-
+const AboutTabContent = ({ uiVersion, serverVersion, status, permissions }) => {
+  const text = useAboutText()
+  const rows = [
+    [text.app, text.appName],
+    [text.status, text[status]],
+    [text.compatibility, 'Subsonic / OpenSubsonic'],
+    [text.collection, text.collectionValue],
+    ...(permissions === 'admin'
+      ? [[text.management, text.managementValue]]
+      : []),
+    [
+      text.source,
+      <Link
+        href={repositoryURL}
+        target="_blank"
+        rel="noopener noreferrer"
+        key="source"
+      >
+        edwardlewis35/navidrome
+      </Link>,
+    ],
+    [
+      text.issues,
+      <Link
+        href={`${repositoryURL}/issues`}
+        target="_blank"
+        rel="noopener noreferrer"
+        key="issues"
+      >
+        {text.issues}
+      </Link>,
+    ],
+  ]
   return (
-    <Table aria-label={translate('menu.about')} size="small">
+    <Table aria-label={text.title} size="small">
       <TableBody>
         <ShowVersion uiVersion={uiVersion} serverVersion={serverVersion} />
-        {Object.keys(links).map((key) => {
-          return (
-            <TableRow key={key}>
-              <TableCell align="right" component="th" scope="row">
-                {translate(`about.links.${key}`, {
-                  _: humanize(underscore(key)),
-                })}
-                :
-              </TableCell>
-              <TableCell align="left">
-                <Link
-                  href={`https://${links[key]}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {links[key]}
-                </Link>
-              </TableCell>
-            </TableRow>
-          )
-        })}
-        {permissions === 'admin' ? (
-          <TableRow>
+        {rows.map(([label, value]) => (
+          <TableRow key={label}>
             <TableCell align="right" component="th" scope="row">
-              {translate(`about.links.lastInsightsCollection`)}:
+              {label}:
             </TableCell>
-            <TableCell align="left">
-              <Link href={INSIGHTS_DOC_URL}>{insightsStatus}</Link>
-            </TableCell>
+            <TableCell align="left">{value}</TableCell>
           </TableRow>
-        ) : null}
-        <TableRow>
-          <TableCell align="right" component="th" scope="row">
-            <Link
-              href={'https://github.com/sponsors/deluan'}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <IconButton size={'small'}>
-                <FavoriteBorderIcon fontSize={'small'} />
-              </IconButton>
-            </Link>
-          </TableCell>
-          <TableCell align="left">
-            <Link
-              href={'https://ko-fi.com/deluan'}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ko-fi.com/deluan
-            </Link>
-          </TableCell>
-        </TableRow>
+        ))}
       </TableBody>
     </Table>
   )
@@ -380,8 +330,7 @@ const TabContent = ({
   showConfigTab,
   uiVersion,
   serverVersion,
-  insightsData,
-  loading,
+  status,
   permissions,
   configData,
 }) => {
@@ -412,8 +361,7 @@ const TabContent = ({
         <AboutTabContent
           uiVersion={uiVersion}
           serverVersion={serverVersion}
-          insightsData={insightsData}
-          loading={loading}
+          status={status}
           permissions={permissions}
         />
       </div>
@@ -434,10 +382,8 @@ const TabContent = ({
 const AboutDialog = ({ open, onClose }) => {
   const classes = useStyles()
   const { permissions } = usePermissions()
-  const { data: insightsData, loading } = useGetOne(
-    'insights',
-    'insights_status',
-  )
+  const text = useAboutText()
+  const [status, setStatus] = useState('checking')
   const [serverVersion, setServerVersion] = useState('')
   const showConfigTab = permissions === 'admin' && config.devUIShowConfig
   const [tab, setTab] = useState(0)
@@ -448,19 +394,26 @@ const AboutDialog = ({ open, onClose }) => {
   const uiVersion = config.version
 
   useEffect(() => {
+    if (!open) return
+    let active = true
+    setStatus('checking')
+    setServerVersion('')
     subsonic
       .ping()
       .then((resp) => resp.json['subsonic-response'])
       .then((data) => {
-        if (data.status === 'ok') {
-          setServerVersion(data.serverVersion)
-        }
+        if (!active) return
+        if (data.status !== 'ok') throw new Error('Server unavailable')
+        setServerVersion(data.serverVersion || config.version)
+        setStatus('online')
       })
-      .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error('error pinging server', e)
+      .catch(() => {
+        if (active) setStatus('offline')
       })
-  }, [setServerVersion])
+    return () => {
+      active = false
+    }
+  }, [open])
 
   return (
     <Dialog
@@ -472,7 +425,7 @@ const AboutDialog = ({ open, onClose }) => {
       className={classes.expandableDialog}
     >
       <DialogTitle id="about-dialog-title" onClose={onClose}>
-        Navidrome Music Server
+        {text.title}
       </DialogTitle>
       <DialogContent dividers>
         <TabContent
@@ -481,8 +434,7 @@ const AboutDialog = ({ open, onClose }) => {
           showConfigTab={showConfigTab}
           uiVersion={uiVersion}
           serverVersion={serverVersion}
-          insightsData={insightsData}
-          loading={loading}
+          status={status}
           permissions={permissions}
           configData={configData}
         />

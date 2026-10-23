@@ -21,6 +21,7 @@ func (api *Router) addSongTrashRoutes(r chi.Router) {
 	trash := core.NewSongTrash(api.ds, conf.Server.DataFolder.String())
 	r.Route("/song", func(r chi.Router) {
 		r.Get("/", rest.GetAll(api.ds.MediaFile()))
+		r.With(adminOnlyMiddleware).Post("/batch", manageSongs(trash))
 		r.Route("/{id}", func(r chi.Router) {
 			r.Use(server.URLParamsMiddleware)
 			r.Get("/", rest.Get(api.ds.MediaFile()))
@@ -115,7 +116,7 @@ func songTrashResult(w http.ResponseWriter, entry *core.SongTrashEntry) {
 }
 
 func songTrashError(w http.ResponseWriter, r *http.Request, err error, deleted ...int) {
-	status, message := http.StatusInternalServerError, "The trash operation could not finish. Refresh the trash list and check server logs. An interrupted confirmed permanent deletion will finish during recovery."
+	status, message := http.StatusInternalServerError, "The trash operation could not finish. Refresh the trash list and check server logs. An interrupted deletion may finish during recovery if its permanent-delete intent was recorded."
 	switch {
 	case errors.Is(err, core.ErrTrashUnauthorized):
 		status, message = http.StatusUnauthorized, "Authentication required"

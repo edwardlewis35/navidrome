@@ -15,6 +15,7 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/core/agents"
 	"github.com/navidrome/navidrome/core/ffmpeg"
+	"github.com/navidrome/navidrome/core/onlinecover"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/persistence"
 )
@@ -201,6 +202,9 @@ func (r *resolver) resolveAlbum(ctx context.Context, albumID string) (resolution
 	al, err := r.ds.Album().Get(ctx, albumID)
 	if err != nil {
 		return resolution{}, err
+	}
+	if res, ok := resolveLocalFile(onlinecover.Path("album", albumID), "upload"); ok {
+		return res, nil
 	}
 	_, imgFiles, _, err := loadAlbumFoldersPaths(ctx, r.ds, *al)
 	if err != nil {
@@ -445,6 +449,9 @@ func (r *resolver) resolveMediaFile(ctx context.Context, id string) (resolution,
 	mf, err := r.ds.MediaFile().Get(ctx, id)
 	if err != nil {
 		return resolution{}, err
+	}
+	if res, ok := resolveLocalFile(onlinecover.Path("song", id), "upload"); ok {
+		return res, nil
 	}
 	chain := chainState{trace: traceFrom(ctx)}
 	switch {

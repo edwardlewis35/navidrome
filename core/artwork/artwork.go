@@ -13,6 +13,7 @@ import (
 	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/core/agents"
 	"github.com/navidrome/navidrome/core/ffmpeg"
+	"github.com/navidrome/navidrome/core/onlinecover"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/resources"
@@ -261,16 +262,27 @@ func (s *service) serveResolution(ctx context.Context, res resolution, size int,
 }
 
 func (s *service) serveMediaFile(ctx context.Context, artID model.ArtworkID, size int, square bool) (*Image, error) {
+	ia, err := s.ds.Artwork().GetItemArtwork(ctx, model.KindMediaFileArtwork, artID.ID, model.ImageTypePrimary)
+	// Explicit local covers remain readable while their state is queued for resolution,
+	// including tracks without embedded art and when embedded extraction is disabled.
+	if errors.Is(err, model.ErrNotFound) {
+		if _, entityErr := s.ds.MediaFile().Get(ctx, artID.ID); entityErr != nil {
+			return nil, entityErr
+		}
+		if res, ok := resolveLocalFile(onlinecover.Path("song", artID.ID), "upload"); ok {
+			s.enqueue(ctx, artID, model.ArtworkPriorityBump)
+			return s.serveResolution(ctx, res, size, square)
+		}
+	}
 	// The setting is not in the config fingerprint, so honor it at serve time: a direct mf- URL
 	// must fall back to disc/album instead of serving stale persisted embedded art.
-	if !conf.Server.EnableMediaFileCoverArt {
+	if !conf.Server.EnableMediaFileCoverArt && (err != nil || ia.Source != "upload") {
 		mf, err := s.ds.MediaFile().Get(ctx, artID.ID)
 		if err != nil {
 			return nil, err
 		}
 		return s.Get(ctx, mf.DiscCoverArtID(), size, square)
 	}
-	ia, err := s.ds.Artwork().GetItemArtwork(ctx, model.KindMediaFileArtwork, artID.ID, model.ImageTypePrimary)
 	switch {
 	case err == nil && ia.Hash != "":
 		return s.serveHash(ctx, artID, ia, size, square)

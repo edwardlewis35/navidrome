@@ -1,6 +1,6 @@
 import albumLists, { defaultAlbumList } from '../album/albumLists'
 
-export const resourceDefaultViews = ['artist', 'song', 'playlist', 'radio']
+export const resourceDefaultViews = ['artist', 'song', 'playlist']
 
 export const isResourceDefaultView = (defaultView) =>
   resourceDefaultViews.includes(defaultView)
@@ -16,5 +16,9 @@ export const getDefaultViewChoices = (translate) => [
   })),
 ]
 
-export const getStoredDefaultView = () =>
-  localStorage.getItem('defaultView') || defaultAlbumList
+export const getStoredDefaultView = () => {
+  const view = localStorage.getItem('defaultView')
+  return isResourceDefaultView(view) || Object.keys(albumLists).includes(view)
+    ? view
+    : defaultAlbumList
+}

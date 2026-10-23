@@ -18,10 +18,8 @@ import song from './song'
 import album from './album'
 import artist from './artist'
 import playlist from './playlist'
-import radio from './radio'
 import share from './share'
 import library from './library'
-import plugin from './plugin'
 import { Player } from './audioplayer'
 import customRoutes from './routes'
 import {
@@ -129,10 +127,6 @@ const Admin = (props) => {
         <Resource name="album" {...album} options={{ subMenu: 'albumList' }} />,
         <Resource name="artist" {...artist} />,
         <Resource name="song" {...song} />,
-        <Resource
-          name="radio"
-          {...(permissions === 'admin' ? radio.admin : radio.all)}
-        />,
         config.enableSharing && <Resource name="share" {...share} />,
         <Resource
           name="playlist"
@@ -168,14 +162,6 @@ const Admin = (props) => {
             options={{ subMenu: 'settings' }}
           />
         ) : null,
-        permissions === 'admin' && config.pluginsEnabled ? (
-          <Resource
-            name="plugin"
-            {...plugin}
-            options={{ subMenu: 'settings' }}
-          />
-        ) : null,
-
         <Resource name="translation" />,
         <Resource name="genre" />,
         <Resource name="tag" />,
