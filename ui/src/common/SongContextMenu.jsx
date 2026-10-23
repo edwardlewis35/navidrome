@@ -6,8 +6,21 @@ import {
   usePermissions,
   useTranslate,
   useDataProvider,
+  useRefresh,
 } from 'react-admin'
-import { IconButton, Menu, MenuItem } from '@material-ui/core'
+import {
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  IconButton,
+  Menu,
+  MenuItem,
+  Typography,
+} from '@material-ui/core'
 import { makeStyles } from '@material-ui/core/styles'
 import MoreVertIcon from '@material-ui/icons/MoreVert'
 import { MdQuestionMark } from 'react-icons/md'
@@ -27,11 +40,13 @@ import config from '../config'
 import { playSimilar } from './playbackActions.js'
 import { formatBytes } from '../utils'
 import { useRedirect } from 'react-admin'
+import { trashErrorMessage } from '../trash/trashErrorMessage'
 
 const useStyles = makeStyles({
   noWrap: {
     whiteSpace: 'nowrap',
   },
+  destructive: { color: '#d93636' },
 })
 
 const MoreButton = ({ record, onClick, info }) => {
@@ -68,8 +83,12 @@ export const SongContextMenu = ({
   const [playlistAnchorEl, setPlaylistAnchorEl] = useState(null)
   const [playlists, setPlaylists] = useState([])
   const [playlistsLoaded, setPlaylistsLoaded] = useState(false)
-  const { permissions } = usePermissions()
+  const { permissions, loading: permissionsLoading } = usePermissions()
   const redirect = useRedirect()
+  const refresh = useRefresh()
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [trashing, setTrashing] = useState(false)
+  const [trashError, setTrashError] = useState('')
 
   const options = {
     playNow: {
@@ -168,6 +187,36 @@ export const SongContextMenu = ({
         dispatch(openExtendedInfoDialog(fullRecord))
       },
     },
+    moveToTrash: {
+      enabled:
+        permissions === 'admin' &&
+        !permissionsLoading &&
+        Boolean(record.mediaFileId || record.id) &&
+        !record.missing,
+      label: translate('resources.trash.moveToTrash'),
+      action: () => {
+        setTrashError('')
+        setTrashOpen(true)
+      },
+    },
+  }
+
+  const confirmTrash = async () => {
+    if (permissions !== 'admin' || permissionsLoading || trashing) return
+    setTrashing(true)
+    setTrashError('')
+    try {
+      await dataProvider.moveSongToTrash(record.mediaFileId || record.id)
+      setTrashOpen(false)
+      notify(translate('resources.trash.moved'), { type: 'info' })
+      refresh()
+    } catch (error) {
+      setTrashError(
+        trashErrorMessage(error, translate('resources.trash.moveFailed')),
+      )
+    } finally {
+      setTrashing(false)
+    }
   }
 
   const handleClick = (e) => {
@@ -197,7 +246,7 @@ export const SongContextMenu = ({
 
   const handleItemClick = (e) => {
     e.preventDefault()
-    const key = e.target.getAttribute('value')
+    const key = e.currentTarget.getAttribute('value')
     const action = options[key].action
 
     if (key === 'showInPlaylist') {
@@ -260,6 +309,9 @@ export const SongContextMenu = ({
               <MenuItem
                 value={key}
                 key={key}
+                className={
+                  key === 'moveToTrash' ? classes.destructive : undefined
+                }
                 onClick={
                   showInPlaylistDisabled
                     ? (e) => e.stopPropagation()
@@ -276,6 +328,45 @@ export const SongContextMenu = ({
           )
         })}
       </Menu>
+      {permissions === 'admin' && !permissionsLoading && (
+        <Dialog
+          open={trashOpen}
+          onClose={() => !trashing && setTrashOpen(false)}
+          onClick={(event) => event.stopPropagation()}
+          aria-labelledby={`trash-song-${record.id}`}
+          disableEscapeKeyDown={trashing}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle id={`trash-song-${record.id}`}>
+            {translate('resources.trash.confirmTitle')}
+          </DialogTitle>
+          <DialogContent>
+            <Typography gutterBottom>{record.title || record.path}</Typography>
+            <DialogContentText>
+              {translate('resources.trash.confirmDescription')}
+            </DialogContentText>
+            {trashError && (
+              <Typography role="alert" color="error">
+                {trashError}
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button disabled={trashing} onClick={() => setTrashOpen(false)}>
+              {translate('resources.trash.cancel')}
+            </Button>
+            <Button
+              color="primary"
+              disabled={trashing}
+              onClick={confirmTrash}
+              startIcon={trashing ? <CircularProgress size={16} /> : undefined}
+            >
+              {translate('resources.trash.moveToTrash')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       <Menu
         anchorEl={playlistAnchorEl}
         open={Boolean(playlistAnchorEl)}

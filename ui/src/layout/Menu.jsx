@@ -11,6 +11,7 @@ import albumLists from '../album/albumLists'
 import PlaylistsSubMenu from './PlaylistsSubMenu'
 import LibrarySelector from '../common/LibrarySelector'
 import config from '../config'
+import TrashMenuItem from '../trash/TrashMenuItem'
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -144,6 +145,11 @@ const Menu = ({ dense = false }) => {
       ) : (
         resources.filter(subItems('playlist')).map(renderResourceMenuItemLink)
       )}
+      <TrashMenuItem
+        sidebarIsOpen={open}
+        activeClassName={classes.active}
+        dense={dense}
+      />
     </div>
   )
 }

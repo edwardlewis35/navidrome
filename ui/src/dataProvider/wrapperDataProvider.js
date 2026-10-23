@@ -227,6 +227,16 @@ const wrapperDataProvider = {
       ({ json }) => ({ data: json }),
     )
   },
+  moveSongToTrash: (songId) =>
+    httpClient(`${REST_URL}/song/${encodeURIComponent(songId)}`, {
+      method: 'DELETE',
+    }).then(({ json }) => ({ data: json })),
+  getSongTrash: () =>
+    httpClient(`${REST_URL}/trash`).then(({ json }) => ({ data: json })),
+  restoreSongFromTrash: (trashId) =>
+    httpClient(`${REST_URL}/trash/${encodeURIComponent(trashId)}/restore`, {
+      method: 'POST',
+    }).then(({ json }) => ({ data: json })),
   lookupQuickConnect: (code) =>
     httpClient(
       `${REST_URL}/quickconnect?code=${encodeURIComponent(code)}`,

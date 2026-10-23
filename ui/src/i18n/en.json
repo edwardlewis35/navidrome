@@ -457,6 +457,32 @@
         "configKey": "key",
         "configValue": "value"
       }
+    },
+    "trash": {
+      "name": "Trash",
+      "moveToTrash": "Move to trash",
+      "confirmTitle": "Move song to trash?",
+      "confirmDescription": "The audio file will move to recoverable trash. Other servers using this same music folder will lose access to it until you restore it. You can restore the song from Trash.",
+      "cancel": "Cancel",
+      "moved": "Song moved to trash",
+      "moveFailed": "Could not move the song to trash.",
+      "description": "Audio files kept here can be restored to their original location. Song details, favourites and playlist memberships are retained.",
+      "empty": "Trash is empty.",
+      "loading": "Loading trash",
+      "loadFailed": "Could not load trash.",
+      "retry": "Try again",
+      "refresh": "Refresh",
+      "restore": "Restore",
+      "restored": "Song restored",
+      "restoreFailed": "Could not restore the song.",
+      "accessDenied": "Only administrators can access Trash.",
+      "fields": {
+        "song": "Song",
+        "path": "Original file path",
+        "deletedAt": "Moved to trash",
+        "deletedBy": "Moved by",
+        "actions": "Actions"
+      }
     }
   },
   "ra": {
@@ -651,7 +677,12 @@
     "shareSuccess": "URL copied to clipboard: %{url}",
     "shareFailure": "Error copying URL %{url} to clipboard",
     "downloadDialogTitle": "Download %{resource} '%{name}' (%{size})",
-    "downloadOriginalFormat": "Download in original format"
+    "downloadOriginalFormat": "Download in original format",
+    "continuousLoading": "Loading more…",
+    "continuousLoadMore": "Load more",
+    "continuousLoadFailed": "Could not load more items. Please try again.",
+    "continuousCount": "%{loaded} of %{total} items loaded",
+    "continuousRetry": "Try again"
   },
   "menu": {
     "library": "Library",

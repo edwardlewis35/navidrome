@@ -418,6 +418,32 @@
         "configKey": "鍵",
         "configValue": "值"
       }
+    },
+    "trash": {
+      "name": "回收站",
+      "moveToTrash": "移至回收站",
+      "confirmTitle": "將歌曲移至回收站？",
+      "confirmDescription": "音訊檔案會移入可復原的回收站。使用同一音樂資料夾的其他服務也將無法播放該檔案，直到你將其復原。之後可在回收站中還原歌曲。",
+      "cancel": "取消",
+      "moved": "歌曲已移至回收站",
+      "moveFailed": "無法將歌曲移至回收站。",
+      "description": "這裡保存的音訊檔案可以復原至原位置，歌曲資訊、收藏和播放清單關聯會保留。",
+      "empty": "回收站是空的。",
+      "loading": "正在載入回收站",
+      "loadFailed": "無法載入回收站。",
+      "retry": "重試",
+      "refresh": "重新整理",
+      "restore": "復原",
+      "restored": "歌曲已復原",
+      "restoreFailed": "無法復原歌曲。",
+      "accessDenied": "只有管理員可以存取回收站。",
+      "fields": {
+        "song": "歌曲",
+        "path": "原始檔案路徑",
+        "deletedAt": "移入時間",
+        "deletedBy": "操作人",
+        "actions": "操作"
+      }
     }
   },
   "ra": {
@@ -609,7 +635,12 @@
     "coverRemoved": "已移除封面圖",
     "coverUploadError": "上傳封面圖時發生錯誤",
     "coverRemoveError": "移除封面圖時發生錯誤",
-    "metadataRefreshStarted": "正在背景重新整理中繼資料"
+    "metadataRefreshStarted": "正在背景重新整理中繼資料",
+    "continuousLoading": "正在載入更多…",
+    "continuousLoadMore": "載入更多",
+    "continuousLoadFailed": "暫時無法載入更多內容，請重試。",
+    "continuousCount": "已顯示 %{loaded} / %{total} 項",
+    "continuousRetry": "重試"
   },
   "menu": {
     "library": "媒體庫",

@@ -7,5 +7,5 @@ services:
       ND_LOGLEVEL: info
     volumes:
       - "${NAVIDROME_DATA_PATH:-./netease-data}:/data"
-      - "${NAVIDROME_MUSIC_PATH:-./music}:/music:ro"
+      - "${NAVIDROME_MUSIC_PATH:-./music}:/music"
     restart: unless-stopped

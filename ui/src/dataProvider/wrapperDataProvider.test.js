@@ -22,6 +22,50 @@ describe('wrapperDataProvider', () => {
     mockHttpClient.mockResolvedValue({ json: [] })
   })
 
+  describe('recoverable song trash', () => {
+    it('uses DELETE on the encoded song id and returns the trash identity', async () => {
+      mockHttpClient.mockResolvedValue({
+        json: { id: 'song/one', trashId: 'trash-uuid' },
+      })
+      await expect(
+        wrapperDataProvider.moveSongToTrash('song/one'),
+      ).resolves.toEqual({ data: { id: 'song/one', trashId: 'trash-uuid' } })
+      expect(mockHttpClient).toHaveBeenCalledWith('/api/song/song%2Fone', {
+        method: 'DELETE',
+      })
+    })
+
+    it('loads the backend array with a react-admin data envelope', async () => {
+      const entries = [{ id: 'trash-uuid', mediaFileId: 'song-one' }]
+      mockHttpClient.mockResolvedValue({ json: entries })
+      await expect(wrapperDataProvider.getSongTrash()).resolves.toEqual({
+        data: entries,
+      })
+      expect(mockHttpClient).toHaveBeenCalledWith('/api/trash')
+    })
+
+    it('restores by the encoded trash id with POST', async () => {
+      mockHttpClient.mockResolvedValue({
+        json: { id: 'song-one', trashId: 'trash/one' },
+      })
+      await expect(
+        wrapperDataProvider.restoreSongFromTrash('trash/one'),
+      ).resolves.toEqual({ data: { id: 'song-one', trashId: 'trash/one' } })
+      expect(mockHttpClient).toHaveBeenCalledWith(
+        '/api/trash/trash%2Fone/restore',
+        { method: 'POST' },
+      )
+    })
+
+    it('propagates a server refusal for the UI to display', async () => {
+      const error = { status: 403, body: { error: 'Forbidden' } }
+      mockHttpClient.mockRejectedValue(error)
+      await expect(
+        wrapperDataProvider.moveSongToTrash('song-one'),
+      ).rejects.toBe(error)
+    })
+  })
+
   describe('update user', () => {
     it('sets library associations when an admin edits a non-admin user', async () => {
       localStorage.setItem('role', 'admin')

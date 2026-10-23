@@ -241,7 +241,7 @@ const PlaylistSongs = ({ playlistId, readOnly, actions, ...props }) => {
         </Card>
       </div>
       <ExpandInfoDialog content={<SongInfo />} />
-      {React.cloneElement(props.pagination, listContext)}
+      {props.pagination && React.cloneElement(props.pagination, listContext)}
     </>
   )
 }

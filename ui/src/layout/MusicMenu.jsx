@@ -18,6 +18,7 @@ import LibrarySelector from '../common/LibrarySelector'
 import PlaylistsSubMenu from './PlaylistsSubMenu'
 import useMusicText from './useMusicText'
 import config from '../config'
+import TrashMenuItem from '../trash/TrashMenuItem'
 
 const useStyles = makeStyles({
   root: {
@@ -97,6 +98,7 @@ export default function MusicMenu() {
         />
       )}
       {item('/personal', text.preferences, <Tune />)}
+      <TrashMenuItem sidebarIsOpen={open} activeClassName={classes.active} />
       {open && <p className={classes.footer}>NAVIDROME · {text.online}</p>}
     </nav>
   )

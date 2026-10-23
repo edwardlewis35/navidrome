@@ -26,8 +26,6 @@ import {
   useResourceRefresh,
   ArtistLinkField,
   PathField,
-  defaultRowsPerPageOptions,
-  getStoredPerPage,
 } from '../common'
 import { useDispatch } from 'react-redux'
 import { makeStyles } from '@material-ui/core/styles'
@@ -217,11 +215,6 @@ const SongList = (props) => {
         bulkActionButtons={<SongBulkActions />}
         actions={<SongListActions />}
         filters={<SongFilter />}
-        perPage={getStoredPerPage(
-          'song',
-          defaultRowsPerPageOptions,
-          isXsmall ? 50 : 15,
-        )}
       >
         {isXsmall ? (
           <SongSimpleList />

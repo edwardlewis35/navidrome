@@ -20,9 +20,7 @@ import FavoriteIcon from '@material-ui/icons/Favorite'
 import { withWidth } from '@material-ui/core'
 import {
   List,
-  Pagination,
   Title,
-  useAlbumsPerPage,
   useResourceRefresh,
   useScrollRestoration,
   useSetToggleableFields,
@@ -30,7 +28,6 @@ import {
 import AlbumListActions from './AlbumListActions'
 import AlbumTableView from './AlbumTableView'
 import AlbumGridView from './AlbumGridView'
-import { useRollChanged } from './useRollChanged'
 import albumLists from './albumLists'
 import {
   getStoredDefaultView,
@@ -188,22 +185,11 @@ const AlbumListTitle = ({ albumListType }) => {
   return <Title subTitle={title} args={{ smart_count: 2 }} />
 }
 
-const AlbumListPagination = ({ albumListType, seed, shownSeed, ...rest }) => {
-  const { loading } = useListContext()
-  const rerolling = useRollChanged(shownSeed, seed, loading)
-  if (rerolling && albumListType === 'random') {
-    return null
-  }
-  return <Pagination {...rest} />
-}
-
 const randomStartingSeed = Math.random().toString()
 
 const AlbumList = (props) => {
-  const { width } = props
   const shownSeed = useRef(null)
   const albumView = useSelector((state) => state.albumView)
-  const [perPage, perPageOptions] = useAlbumsPerPage(width)
   const location = useLocation()
   const version = useVersion()
   const refresh = useRefresh()
@@ -259,15 +245,6 @@ const AlbumList = (props) => {
         filter={{ seed }}
         actions={<AlbumListActions />}
         filters={<AlbumFilter />}
-        perPage={perPage}
-        pagination={
-          <AlbumListPagination
-            rowsPerPageOptions={perPageOptions}
-            albumListType={albumListType}
-            seed={seed}
-            shownSeed={shownSeed}
-          />
-        }
         title={<AlbumListTitle albumListType={albumListType} />}
       >
         <ScrollRestorer>

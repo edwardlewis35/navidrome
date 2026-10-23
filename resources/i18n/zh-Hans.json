@@ -420,6 +420,32 @@
         "configKey": "键",
         "configValue": "值"
       }
+    },
+    "trash": {
+      "name": "回收站",
+      "moveToTrash": "移至回收站",
+      "confirmTitle": "将歌曲移至回收站？",
+      "confirmDescription": "音频文件会移入可恢复的回收站。使用同一音乐文件夹的其他服务也将无法播放该文件，直到你将其恢复。之后可在回收站中还原歌曲。",
+      "cancel": "取消",
+      "moved": "歌曲已移至回收站",
+      "moveFailed": "无法将歌曲移至回收站。",
+      "description": "这里保存的音频文件可以恢复到原位置，歌曲信息、收藏和歌单关联会保留。",
+      "empty": "回收站为空。",
+      "loading": "正在加载回收站",
+      "loadFailed": "无法加载回收站。",
+      "retry": "重试",
+      "refresh": "刷新",
+      "restore": "恢复",
+      "restored": "歌曲已恢复",
+      "restoreFailed": "无法恢复歌曲。",
+      "accessDenied": "只有管理员可以访问回收站。",
+      "fields": {
+        "song": "歌曲",
+        "path": "原文件路径",
+        "deletedAt": "移入时间",
+        "deletedBy": "操作人",
+        "actions": "操作"
+      }
     }
   },
   "ra": {
@@ -611,7 +637,12 @@
     "shareSuccess": "URL 已复制: %{url}",
     "shareFailure": "URL 复制失败: %{url}",
     "downloadDialogTitle": "下载 %{resource} '%{name}' (%{size})",
-    "downloadOriginalFormat": "下载原始格式"
+    "downloadOriginalFormat": "下载原始格式",
+    "continuousLoading": "正在加载更多…",
+    "continuousLoadMore": "加载更多",
+    "continuousLoadFailed": "暂时无法加载更多内容，请重试。",
+    "continuousCount": "已显示 %{loaded} / %{total} 项",
+    "continuousRetry": "重试"
   },
   "menu": {
     "library": "媒体库",
