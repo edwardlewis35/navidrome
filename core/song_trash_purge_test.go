@@ -18,7 +18,7 @@ func TestSongTrashPermanentDeleteAndRetry(t *testing.T) {
 	}
 	// A newly created file at the old path is unrelated to the trash payload.
 	replacement := []byte("replacement music survives permanent trash deletion")
-	if err := os.WriteFile(filepath.Join(f.music, f.path), replacement, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.music, f.path), replacement, 0600); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
@@ -143,7 +143,7 @@ func TestSongTrashClearSelectedSnapshotAndPartialFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.ds.repo.Data["new-song"] = &model.MediaFile{ID: "new-song", LibraryID: 1, Path: "later.mp3"}
-	if err := os.WriteFile(filepath.Join(f.music, "later.mp3"), []byte("later trash fixture"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.music, "later.mp3"), []byte("later trash fixture"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	later, err := f.service.Delete(f.ctx, "new-song")
@@ -173,7 +173,7 @@ func TestSongTrashClearReportsCompletedCount(t *testing.T) {
 	for _, id := range []string{"song", "second", "third"} {
 		if id != "song" {
 			f.ds.repo.Data[id] = &model.MediaFile{ID: id, LibraryID: 1, Path: id + ".mp3"}
-			if err := os.WriteFile(filepath.Join(f.music, id+".mp3"), f.content, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(f.music, id+".mp3"), f.content, 0600); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -203,10 +203,10 @@ func trashRollbackDelete(library, trash *os.Root, j *songTrashJournal, info fs.F
 	safeOriginal := !removed && sourceErr == nil && trashSameSource(info, current)
 	if errors.Is(sourceErr, fs.ErrNotExist) && j.SHA256 != "" {
 		if err := trashVerify(trash, payload, j); err != nil {
-			return fmt.Errorf("%w; recovery is retained in trash %s: %v", cause, j.ID, err)
+			return fmt.Errorf("%w; recovery is retained in trash %s: %w", cause, j.ID, err)
 		}
 		if _, _, err := trashCopy(trash, payload, library, j.Path, fs.FileMode(j.Mode)); err != nil {
-			return fmt.Errorf("%w; recovery is retained in trash %s: %v", cause, j.ID, err)
+			return fmt.Errorf("%w; recovery is retained in trash %s: %w", cause, j.ID, err)
 		}
 		safeOriginal = true
 	}
@@ -350,7 +350,7 @@ func (s *SongTrash) Restore(ctx context.Context, trashID string) (*SongTrashEntr
 		// Remove only our verified copy; the recovery payload stays untouched.
 		if current, statErr := library.Lstat(j.Path); publishedInfo != nil && statErr == nil && os.SameFile(current, publishedInfo) {
 			if cleanupErr := library.Remove(j.Path); cleanupErr != nil {
-				return nil, fmt.Errorf("%w; recovery copies retained: %v", err, cleanupErr)
+				return nil, fmt.Errorf("%w; recovery copies retained: %w", err, cleanupErr)
 			}
 		}
 		j.State = "trashed"
