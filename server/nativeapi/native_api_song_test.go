@@ -268,6 +268,8 @@ var _ = Describe("Song Endpoints", func() {
 			{http.MethodDelete, "/song/song-1"},
 			{http.MethodGet, "/trash"},
 			{http.MethodPost, "/trash/00000000-0000-0000-0000-000000000000/restore"},
+			{http.MethodDelete, "/trash/00000000-0000-0000-0000-000000000000"},
+			{http.MethodDelete, "/trash"},
 		} {
 			It("rejects unauthenticated "+endpoint.method+" "+endpoint.path, func() {
 				router.ServeHTTP(w, createUnauthenticatedRequest(endpoint.method, endpoint.path, nil))
@@ -323,6 +325,47 @@ var _ = Describe("Song Endpoints", func() {
 			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodGet, "/trash", nil))
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(w.Body.String()).To(MatchJSON(`[]`))
+		})
+
+		It("requires explicit confirmation before permanently deleting an isolated trash entry", func() {
+			base := GinkgoT().TempDir()
+			music, data := filepath.Join(base, "music"), filepath.Join(base, "data")
+			Expect(os.Mkdir(music, 0755)).To(Succeed())
+			Expect(os.Mkdir(data, 0700)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(music, "fixture.mp3"), []byte("temporary purge fixture"), 0644)).To(Succeed())
+			conf.Server.DataFolder = conf.NewDir(data)
+			libs := &tests.MockLibraryRepo{}
+			libs.SetData(model.Libraries{{ID: 1, Path: music}})
+			ds.MockedLibrary = libs
+			mfRepo.Data["song-1"].Path, mfRepo.Data["song-1"].LibraryID = "fixture.mp3", 1
+			testUser.IsAdmin = true
+			Expect(userRepo.Put(ctx, &testUser)).To(Succeed())
+			router = server.JWTVerifier(New(ds, nil, playlists.NewPlaylists(ds, nil), nil, tests.NewMockLibraryService(), tests.NewMockUserService(), nil, nil, nil, nil, nil))
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodDelete, "/song/song-1", nil))
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+			var deleted struct{ ID, TrashID string }
+			Expect(json.Unmarshal(w.Body.Bytes(), &deleted)).To(Succeed())
+			for _, endpoint := range []string{"/trash", "/trash/" + deleted.TrashID} {
+				for _, body := range []string{"", `{}`, `{"confirm":false}`, `{"confirm":"true"}`, `{"confirm":true} {}`, `{"confirm":true,"unknown":true}`, `{"confirm":true,"ids":null}`, `{"confirm":true,"ids":"invalid"}`} {
+					w = httptest.NewRecorder()
+					router.ServeHTTP(w, createAuthenticatedRequest(http.MethodDelete, endpoint, []byte(body)))
+					Expect(w.Code).To(Equal(http.StatusBadRequest), body+": "+w.Body.String())
+					Expect(filepath.Join(data, "song-trash", deleted.TrashID, "audio")).To(BeAnExistingFile())
+				}
+			}
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodDelete, "/trash/"+deleted.TrashID, []byte(`{"confirm":true}`)))
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+			Expect(w.Body.String()).To(MatchJSON(`{"id":"` + deleted.TrashID + `","mediaFileId":"song-1"}`))
+			Expect(filepath.Join(data, "song-trash", deleted.TrashID, "audio")).ToNot(BeAnExistingFile())
+			Expect(mfRepo.Data).ToNot(HaveKey("song-1"))
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodPost, "/trash/"+deleted.TrashID+"/restore", nil))
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodDelete, "/trash", []byte(`{"confirm":true}`)))
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+			Expect(w.Body.String()).To(MatchJSON(`{"deleted":0}`))
 		})
 	})
 

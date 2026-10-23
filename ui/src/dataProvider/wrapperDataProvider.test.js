@@ -57,6 +57,44 @@ describe('wrapperDataProvider', () => {
       )
     })
 
+    it('permanently deletes only the encoded trash id with DELETE', async () => {
+      mockHttpClient.mockResolvedValue({
+        json: { id: 'trash/one', mediaFileId: 'song-one' },
+      })
+      await expect(
+        wrapperDataProvider.permanentlyDeleteSongFromTrash('trash/one'),
+      ).resolves.toEqual({
+        data: { id: 'trash/one', mediaFileId: 'song-one' },
+      })
+      expect(mockHttpClient).toHaveBeenCalledWith('/api/trash/trash%2Fone', {
+        method: 'DELETE',
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ confirm: true }),
+      })
+    })
+
+    it('clears trash with DELETE and returns the completed count', async () => {
+      mockHttpClient.mockResolvedValue({ json: { deleted: 3 } })
+      const ids = ['trash-one', 'trash-two', 'trash-three']
+      await expect(wrapperDataProvider.emptySongTrash(ids)).resolves.toEqual({
+        data: { deleted: 3 },
+      })
+      expect(mockHttpClient).toHaveBeenCalledWith('/api/trash', {
+        method: 'DELETE',
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ confirm: true, ids }),
+      })
+    })
+
+    it('retains the count and readable error from a partial clear failure', async () => {
+      const failure = {
+        status: 500,
+        body: { deleted: 2, error: 'Could not remove a trash file' },
+      }
+      mockHttpClient.mockRejectedValue(failure)
+      await expect(wrapperDataProvider.emptySongTrash()).rejects.toBe(failure)
+    })
+
     it('propagates a server refusal for the UI to display', async () => {
       const error = { status: 403, body: { error: 'Forbidden' } }
       mockHttpClient.mockRejectedValue(error)

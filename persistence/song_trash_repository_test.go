@@ -2,7 +2,9 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/deluan/rest"
@@ -151,5 +153,61 @@ var _ = Describe("Song trash persistence", func() {
 		restored, err := repo.Get(ctx, song.ID)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(restored.Title).To(Equal(song.Title))
+	})
+
+	It("requires administrator authority and refuses to purge an available identity", func() {
+		Expect(repo.PurgeTrashed(context.Background(), song.ID)).To(MatchError(rest.ErrPermissionDenied))
+		Expect(repo.PurgeTrashed(request.WithUser(ctx, regularUser), song.ID)).To(MatchError(rest.ErrPermissionDenied))
+		Expect(repo.PurgeTrashed(ctx, song.ID)).To(MatchError(model.ErrNotTrashed))
+		Expect(repo.Exists(ctx, song.ID)).To(BeTrue())
+	})
+
+	It("permanently removes only the trashed identity and all song references, preserving playlist order", func() {
+		Expect(repo.SetStar(ctx, true, song.ID)).To(Succeed())
+		Expect(repo.SetRating(ctx, 4, song.ID)).To(Succeed())
+		Expect(repo.AddBookmark(ctx, song.ID, "purge fixture", 123)).To(Succeed())
+		playlistRepo := NewPlaylistRepository(GetDBXBuilder())
+		playlist := model.Playlist{Name: "Purge fixture playlist", OwnerID: adminUser.ID}
+		playlist.AddMediaFiles(model.MediaFiles{song, songDayInALife, song})
+		Expect(playlistRepo.Put(ctx, &playlist)).To(Succeed())
+		DeferCleanup(func() { Expect(playlistRepo.Delete(ctx, playlist.ID)).To(Succeed()) })
+		Expect(NewScrobbleRepository(GetDBXBuilder()).RecordScrobble(ctx, song.ID, time.Now())).To(Succeed())
+		Expect(NewScrobbleBufferRepository(GetDBXBuilder()).Enqueue(ctx, "lastfm", adminUser.ID, song.ID, time.Now())).To(Succeed())
+		Expect(repo.SetTrashed(ctx, song.ID, true)).To(Succeed())
+		store := newSQLStore(GetDBXBuilder())
+		purge := func() error {
+			return store.WithTxImmediate(func(tx model.DataStore) error { return tx.MediaFile().PurgeTrashed(ctx, song.ID) })
+		}
+		Expect(purge()).To(Succeed())
+		Expect(purge()).To(Succeed(), "journal retry must accept an already removed identity")
+		for table, column := range map[string]string{"media_file": "id", "annotation": "item_id", "bookmark": "item_id", "playlist_tracks": "media_file_id", "scrobbles": "media_file_id", "scrobble_buffer": "media_file_id", "media_file_tags": "media_file_id"} {
+			var count int
+			Expect(GetDBXBuilder().NewQuery(fmt.Sprintf("SELECT count(*) FROM %s WHERE %s = {:id}", table, column)).Bind(map[string]any{"id": song.ID}).Row(&count)).To(Succeed())
+			Expect(count).To(BeZero(), table)
+		}
+		tracks, err := playlistRepo.Tracks(ctx, playlist.ID, false).GetAll(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tracks).To(HaveLen(1))
+		Expect(tracks[0].MediaFileID).To(Equal(songDayInALife.ID))
+		Expect(tracks[0].ID).To(Equal("1"))
+		got, err := playlistRepo.Get(ctx, playlist.ID)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.SongCount).To(Equal(1))
+	})
+
+	It("rolls back the retained identity and annotations if the purge transaction fails", func() {
+		Expect(repo.SetStar(ctx, true, song.ID)).To(Succeed())
+		Expect(repo.SetTrashed(ctx, song.ID, true)).To(Succeed())
+		injected := errors.New("injected failure after DB purge")
+		Expect(newSQLStore(GetDBXBuilder()).WithTxImmediate(func(tx model.DataStore) error {
+			if err := tx.MediaFile().PurgeTrashed(ctx, song.ID); err != nil {
+				return err
+			}
+			return injected
+		})).To(MatchError(injected))
+		Expect(repo.SetTrashed(ctx, song.ID, false)).To(Succeed())
+		got, err := repo.Get(ctx, song.ID)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Starred).To(BeTrue())
 	})
 })

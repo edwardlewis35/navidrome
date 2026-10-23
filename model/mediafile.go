@@ -547,6 +547,9 @@ type MediaFileRepository interface {
 	Put(ctx context.Context, m *MediaFile) error
 	UpdateProbeData(ctx context.Context, id string, data string) error
 	SetTrashed(ctx context.Context, id string, trashed bool) error
+	// PurgeTrashed permanently removes a trashed identity and its references.
+	// Call within WithTxImmediate; missing rows are accepted for journal recovery.
+	PurgeTrashed(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (*MediaFile, error)
 	GetWithParticipants(ctx context.Context, id string) (*MediaFile, error)
 	GetAll(ctx context.Context, options ...QueryOptions) (MediaFiles, error)

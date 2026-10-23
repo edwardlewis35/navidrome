@@ -66,6 +66,21 @@ func (m *MockMediaFileRepo) SetCountAll(count int64) {
 	m.CountAllValue = &count
 }
 
+func (m *MockMediaFileRepo) PurgeTrashed(ctx context.Context, id string) error {
+	user, ok := request.UserFrom(ctx)
+	if !ok || !user.IsAdmin {
+		return rest.ErrPermissionDenied
+	}
+	if m.Err {
+		return errors.New("error")
+	}
+	if mf, ok := m.Data[id]; ok && !mf.Trashed {
+		return model.ErrNotTrashed
+	}
+	delete(m.Data, id)
+	return nil
+}
+
 func (m *MockMediaFileRepo) SetData(mfs model.MediaFiles) {
 	m.Data = make(map[string]*model.MediaFile)
 	for i, mf := range mfs {

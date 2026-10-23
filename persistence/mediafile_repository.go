@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -449,6 +450,45 @@ func (r *mediaFileRepository) FindByPaths(ctx context.Context, paths []string) (
 
 func (r *mediaFileRepository) Delete(ctx context.Context, id string) error {
 	return r.delete(ctx, Eq{"id": id, "trashed": false})
+}
+
+// PurgeTrashed is used only by the durable trash journal inside an immediate
+// transaction. It deliberately bypasses the normal read filter, but never
+// deletes a restored row. The missing-row case makes crash recovery idempotent.
+func (r *mediaFileRepository) PurgeTrashed(ctx context.Context, id string) error {
+	if !loggedUser(ctx).IsAdmin {
+		return rest.ErrPermissionDenied
+	}
+	var row struct{ Trashed bool }
+	err := r.queryOne(ctx, Select("trashed").From(r.tableName).Where(Eq{"id": id}), &row)
+	if err != nil && !errors.Is(err, model.ErrNotFound) {
+		return err
+	}
+	if err == nil && !row.Trashed {
+		return model.ErrNotTrashed
+	}
+	var playlists []string
+	if err := r.queryAllSlice(ctx, Select("distinct playlist_id").From("playlist_tracks").Where(Eq{"media_file_id": id}), &playlists); err != nil {
+		return err
+	}
+	for _, table := range []string{"annotation", "bookmark"} {
+		if _, err := r.executeSQL(ctx, Delete(table).Where(Eq{"item_id": id, "item_type": "media_file"})); err != nil {
+			return err
+		}
+	}
+	if _, err := r.executeSQL(ctx, Delete("playlist_tracks").Where(Eq{"media_file_id": id})); err != nil {
+		return err
+	}
+	if err := r.delete(ctx, Eq{"id": id, "trashed": true}); err != nil {
+		return err
+	}
+	playlistRepo := NewPlaylistRepository(r.db).(*playlistRepository)
+	for _, playlistID := range playlists {
+		if err := playlistRepo.renumber(ctx, playlistID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *mediaFileRepository) ReassignReferences(ctx context.Context, prevID, newID string) error {

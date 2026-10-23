@@ -237,6 +237,18 @@ const wrapperDataProvider = {
     httpClient(`${REST_URL}/trash/${encodeURIComponent(trashId)}/restore`, {
       method: 'POST',
     }).then(({ json }) => ({ data: json })),
+  permanentlyDeleteSongFromTrash: (trashId) =>
+    httpClient(`${REST_URL}/trash/${encodeURIComponent(trashId)}`, {
+      method: 'DELETE',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ confirm: true }),
+    }).then(({ json }) => ({ data: json })),
+  emptySongTrash: (ids) =>
+    httpClient(`${REST_URL}/trash`, {
+      method: 'DELETE',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ confirm: true, ids }),
+    }).then(({ json }) => ({ data: json })),
   lookupQuickConnect: (code) =>
     httpClient(
       `${REST_URL}/quickconnect?code=${encodeURIComponent(code)}`,

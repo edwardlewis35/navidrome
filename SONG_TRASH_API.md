@@ -1,12 +1,14 @@
 # Administrator song trash API
 
-The native API uses Navidrome's existing UI authentication (`x-nd-authorization: Bearer <token>`). All three endpoints require a currently authenticated administrator. Hiding the controls in the UI is supplemented by administrator checks in the HTTP routes, service and database updater.
+The native API uses Navidrome's existing UI authentication (`x-nd-authorization: Bearer <token>`). All endpoints require a currently authenticated administrator. Hiding the controls in the UI is supplemented by administrator checks in the HTTP routes, service and database updater.
 
 | Method | Path | Successful response |
 | --- | --- | --- |
 | `DELETE` | `/api/song/{songId}` | `200 {"id":"songId","trashId":"UUID"}` |
 | `GET` | `/api/trash` | `200` and an array of recoverable entries; empty is `[]` |
 | `POST` | `/api/trash/{trashId}/restore` | `200 {"id":"songId","trashId":"UUID"}` |
+| `DELETE` | `/api/trash/{trashId}` | `200 {"id":"UUID","mediaFileId":"songId"}` |
+| `DELETE` | `/api/trash` | `200 {"deleted":N}` |
 
 An entry contains `id` (trash UUID), `mediaFileId`, `title`, `artist`, `album`, `path` (relative to the music library), `libraryId`, `deletedAt` (UTC RFC3339) and `deletedBy` (administrator username). Entries are returned newest first. Internal absolute paths and integrity digests are omitted from the API.
 
@@ -24,8 +26,18 @@ The media row is retained under the same ID and marked `trashed` and `missing`. 
 
 When two services share a music directory, moving a file removes access for **both services** until it is restored. The other service may mark the file missing after its next scan; its independent metadata and purge policy are outside this service's recovery transaction. Back up both services' data directories and the new service's entire `song-trash` directory together.
 
-There is no permanent-delete/purge endpoint, and no automatic trash expiry. Retain the recovery directory when replacing containers. Completed restore journals are retained for transition history; their audio payload is removed only after the restored file and database update have succeeded. This API does not move sidecar files, album artwork, lyrics or cue-sheet companions. A user can restore a song as long as its recovery file, journal and original library identity are preserved.
+## Permanent deletion and emptying the trash
+
+Both permanent-delete endpoints require a JSON body with an explicit boolean confirmation: `{"confirm":true}`. Missing, false, malformed, unknown-field or multiple-value JSON confirmations return `400` without starting a new deletion. The UI displays an irreversible-operation confirmation dialog first. Permanent deletion is limited to already trashed entries. A restored entry returns `404`; its original or replacement music file is never opened or removed. A completed permanent deletion can be retried using the same UUID and returns the same success response. It cannot be restored afterward (`404`). An unknown UUID returns `404`.
+
+For emptying the trash, optionally send `{"confirm":true,"ids":["UUID-1","UUID-2"]}`. An explicit list limits deletion to those entries, deduplicates UUIDs, and skips entries that have since been restored, already purged or disappeared. Explicit `ids:[]` deletes nothing. `ids:null` and non-array values return `400` to prevent an ambiguous selection from expanding the deletion scope. Omitting `ids` selects all recoverable entries present when the server acquires its trash lock. The UI freezes the displayed UUIDs when opening the confirmation dialog and sends that list, so songs newly moved to trash after the dialog opens remain recoverable.
+
+Emptying processes this fixed selection one entry at a time, with an independent immediate database transaction for each. It stops on the first failure. Its non-2xx JSON response includes `{"deleted":N,"error":"..."}`, where `N` counts entries fully completed during this request. Unprocessed entries remain recoverable. The failed entry may already have a durable permanent-delete intent and can finish during recovery; refreshing the list reconciles the result. Clients must not infer remaining entries from the count alone, and should reload `GET /api/trash` after success or failure.
+
+Before irreversibility, a private `purging` journal is flushed to disk. Under SQLite's immediate writer lock, only a `trashed` row can be removed; an available/restored identity is rejected. Database cleanup removes song annotations, bookmarks and static playlist references, renumbers affected playlist positions and updates their counters. Foreign keys remove associated scrobbles, buffered scrobbles, artist/tag links, and full-text search triggers remove the search row. After the database commit, only this entry's `DataFolder/song-trash/<UUID>/audio` is unlinked and its directory is flushed. No library file is touched. A database or filesystem failure retains the `purging` intent. Startup, scanner and administrator-request recovery finish it idempotently, even if the original music library is offline or changed. Confirming permanent deletion is therefore an irrevocable intent; a request that fails partway may still finish on recovery. Recovery never copies permanently deleted audio back to the music directory.
+
+Completed permanent deletions retain a private `purged` journal tombstone for idempotency and history; its audio payload is gone and it is omitted from the trash list. Completed restores also retain their private journal, with audio removed only after the restored file and database update succeeded. There is no automatic trash expiry. Retain the recovery directory when replacing containers. This API does not delete sidecar files, album artwork, lyrics or cue-sheet companions. A trashed song can be restored only while its recovery file, journal and original library identity are preserved. Permanent deletion cannot erase copies in independent backups or the metadata database of another service.
 
 ## Validation boundary
 
-Automated tests use independent temporary fixtures and synthetic bytes. They never move or delete production music. Tests cover authenticated HTTP routes, regular-user permission bypass attempts, source/path/symlink validation, cross-directory copying, digest validation, restore conflicts, database/commit rollback and interruption recovery. A real deployment should be verified with a dedicated fixture library before enabling writes to a shared music mount.
+Automated tests use independent temporary fixtures and synthetic bytes. They never move or delete production music. Tests cover authenticated HTTP routes, regular-user permission bypass attempts, source/path/symlink validation, cross-directory copying, digest validation, restore conflicts, database/commit rollback, permanent-deletion confirmation and permissions, partial-clear counts, confirmed selection boundaries, reference cleanup, interruption recovery and idempotent retries. A real deployment should be verified with a dedicated fixture library before enabling writes to a shared music mount.

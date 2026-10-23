@@ -623,7 +623,7 @@ func trashReadJournal(root *os.Root, id string) (*songTrashJournal, error) {
 	if j.ID != id || !filepath.IsLocal(j.Path) || j.MediaFileID == "" {
 		return nil, ErrTrashUnsafePath
 	}
-	if j.State != "prepared" && j.State != "trashed" && j.State != "restoring" && j.State != "restored" {
+	if j.State != "prepared" && j.State != "trashed" && j.State != "restoring" && j.State != "restored" && j.State != "purging" && j.State != "purged" {
 		return nil, fmt.Errorf("invalid trash journal state")
 	}
 	return &j, nil
@@ -664,7 +664,13 @@ func (s *SongTrash) recover(ctx context.Context, trash *os.Root) error {
 		return err
 	}
 	for _, j := range entries {
-		if j.State == "trashed" || j.State == "restored" {
+		if j.State == "trashed" || j.State == "restored" || j.State == "purged" {
+			continue
+		}
+		if j.State == "purging" {
+			if err := s.purgeEntry(ctx, trash, j); err != nil {
+				return err
+			}
 			continue
 		}
 		library, err := s.journalLibrary(ctx, j)

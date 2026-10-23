@@ -10,6 +10,11 @@ import {
 import {
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Paper,
   Table,
   TableBody,
@@ -20,7 +25,12 @@ import {
   Typography,
   makeStyles,
 } from '@material-ui/core'
-import { DeleteOutline, Refresh, Restore } from '@material-ui/icons'
+import {
+  DeleteForever,
+  DeleteOutline,
+  Refresh,
+  Restore,
+} from '@material-ui/icons'
 import { trashErrorMessage } from './trashErrorMessage'
 import { useDateLocale } from '../i18n/useDateLocale'
 
@@ -32,7 +42,9 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     gap: theme.spacing(2),
     marginBottom: theme.spacing(2),
+    flexWrap: 'wrap',
   },
+  toolbar: { display: 'flex', gap: theme.spacing(1), flexWrap: 'wrap' },
   description: {
     color: theme.palette.text.secondary,
     marginBottom: theme.spacing(3),
@@ -43,6 +55,7 @@ const useStyles = makeStyles((theme) => ({
   artist: { color: theme.palette.text.secondary, marginTop: 4 },
   path: { maxWidth: 360, overflowWrap: 'anywhere', fontSize: 12 },
   restore: { whiteSpace: 'nowrap' },
+  destructive: { color: theme.palette.error.main, whiteSpace: 'nowrap' },
 }))
 
 function AdminTrashList() {
@@ -55,11 +68,13 @@ function AdminTrashList() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [restoreError, setRestoreError] = useState('')
-  const [restoring, setRestoring] = useState(null)
+  const [actionError, setActionError] = useState('')
+  const [pending, setPending] = useState(null)
+  const [confirmation, setConfirmation] = useState(null)
   const [version, setVersion] = useState(0)
   const mounted = useRef(true)
-  const text = (key) => translate(`resources.trash.${key}`)
+  const busy = useRef(false)
+  const text = (key, options) => translate(`resources.trash.${key}`, options)
 
   useEffect(() => {
     mounted.current = true
@@ -92,9 +107,10 @@ function AdminTrashList() {
   }, [dataProvider, translate, version])
 
   const restore = async (entry) => {
-    if (restoring) return
-    setRestoring(entry.id)
-    setRestoreError('')
+    if (busy.current) return
+    busy.current = true
+    setPending({ type: 'restore', id: entry.id })
+    setActionError('')
     try {
       await dataProvider.restoreSongFromTrash(entry.id)
       if (!mounted.current) return
@@ -103,10 +119,62 @@ function AdminTrashList() {
       refresh()
     } catch (failure) {
       if (mounted.current)
-        setRestoreError(trashErrorMessage(failure, text('restoreFailed')))
+        setActionError(trashErrorMessage(failure, text('restoreFailed')))
     } finally {
-      if (mounted.current) setRestoring(null)
+      busy.current = false
+      if (mounted.current) setPending(null)
     }
+  }
+
+  const permanentlyDelete = async () => {
+    if (!confirmation || busy.current) return
+    const { type, entry, ids } = confirmation
+    busy.current = true
+    setPending({ type, id: entry?.id })
+    setActionError('')
+    try {
+      if (type === 'clear') {
+        await dataProvider.emptySongTrash(ids)
+      } else {
+        await dataProvider.permanentlyDeleteSongFromTrash(entry.id)
+      }
+      if (!mounted.current) return
+      setEntries((current) =>
+        current.filter((item) =>
+          type === 'clear' ? !ids.includes(item.id) : item.id !== entry.id,
+        ),
+      )
+      notify(text(type === 'clear' ? 'emptied' : 'permanentlyDeleted'), {
+        type: 'info',
+      })
+      if (type === 'clear') setVersion((value) => value + 1)
+      refresh()
+    } catch (failure) {
+      if (!mounted.current) return
+      const message = trashErrorMessage(
+        failure,
+        text(type === 'clear' ? 'emptyFailed' : 'permanentDeleteFailed'),
+      )
+      const deleted = failure?.body?.deleted
+      setActionError(
+        type === 'clear' && Number.isInteger(deleted) && deleted > 0
+          ? `${text('partiallyEmptied', { count: deleted })} ${message}`
+          : message,
+      )
+      // A failed request may already have removed entries. Reload the server's
+      // current state before offering another destructive operation.
+      setVersion((value) => value + 1)
+    } finally {
+      busy.current = false
+      if (mounted.current) {
+        setPending(null)
+        setConfirmation(null)
+      }
+    }
+  }
+
+  const closeConfirmation = () => {
+    if (!busy.current) setConfirmation(null)
   }
 
   const formatDate = (value) => {
@@ -125,20 +193,38 @@ function AdminTrashList() {
         <Typography variant="h5" component="h1">
           {text('name')}
         </Typography>
-        <Button
-          startIcon={<Refresh />}
-          disabled={loading || Boolean(restoring)}
-          onClick={() => setVersion((value) => value + 1)}
-        >
-          {text('refresh')}
-        </Button>
+        <div className={classes.toolbar}>
+          <Button
+            startIcon={<Refresh />}
+            disabled={loading || Boolean(pending)}
+            onClick={() => setVersion((value) => value + 1)}
+          >
+            {text('refresh')}
+          </Button>
+          <Button
+            className={classes.destructive}
+            startIcon={<DeleteForever />}
+            disabled={
+              loading || Boolean(error) || Boolean(pending) || !entries.length
+            }
+            onClick={() =>
+              setConfirmation({
+                type: 'clear',
+                count: entries.length,
+                ids: entries.map((entry) => entry.id),
+              })
+            }
+          >
+            {text('emptyTrash')}
+          </Button>
+        </div>
       </div>
       <Typography className={classes.description}>
         {text('description')}
       </Typography>
-      {restoreError && (
+      {actionError && (
         <Typography role="alert" className={classes.error}>
-          {restoreError}
+          {actionError}
         </Typography>
       )}
       <Paper variant="outlined">
@@ -189,17 +275,29 @@ function AdminTrashList() {
                         className={classes.restore}
                         color="primary"
                         startIcon={
-                          restoring === entry.id ? (
+                          pending?.type === 'restore' &&
+                          pending.id === entry.id ? (
                             <CircularProgress size={16} />
                           ) : (
                             <Restore />
                           )
                         }
-                        disabled={Boolean(restoring)}
+                        disabled={Boolean(pending)}
                         onClick={() => restore(entry)}
                         aria-label={`${text('restore')} ${entry.title}`}
                       >
                         {text('restore')}
+                      </Button>
+                      <Button
+                        className={classes.destructive}
+                        startIcon={<DeleteForever />}
+                        disabled={Boolean(pending)}
+                        onClick={() =>
+                          setConfirmation({ type: 'delete', entry })
+                        }
+                        aria-label={`${text('permanentDelete')} ${entry.title}`}
+                      >
+                        {text('permanentDelete')}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -209,6 +307,53 @@ function AdminTrashList() {
           </TableContainer>
         )}
       </Paper>
+      <Dialog
+        open={Boolean(confirmation)}
+        onClose={closeConfirmation}
+        disableEscapeKeyDown={Boolean(pending)}
+        aria-labelledby="trash-purge-title"
+        aria-describedby="trash-purge-description"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle id="trash-purge-title">
+          {text(
+            confirmation?.type === 'clear'
+              ? 'emptyConfirmTitle'
+              : 'permanentDeleteConfirmTitle',
+          )}
+        </DialogTitle>
+        <DialogContent>
+          {confirmation?.entry && (
+            <Typography className={classes.title} gutterBottom>
+              {confirmation.entry.title}
+            </Typography>
+          )}
+          <DialogContentText id="trash-purge-description">
+            {confirmation?.type === 'clear'
+              ? text('emptyConfirmDescription', { count: confirmation.count })
+              : text('permanentDeleteConfirmDescription')}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeConfirmation} disabled={Boolean(pending)}>
+            {text('cancel')}
+          </Button>
+          <Button
+            onClick={permanentlyDelete}
+            color="secondary"
+            variant="contained"
+            disabled={Boolean(pending)}
+            startIcon={
+              pending ? <CircularProgress size={16} /> : <DeleteForever />
+            }
+          >
+            {text(
+              confirmation?.type === 'clear' ? 'emptyTrash' : 'permanentDelete',
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }

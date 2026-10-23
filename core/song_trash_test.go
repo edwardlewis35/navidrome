@@ -20,6 +20,14 @@ type trashTestRepository struct {
 	*tests.MockMediaFileRepo
 	failDelete  bool
 	failRestore bool
+	failPurge   bool
+}
+
+func (r *trashTestRepository) PurgeTrashed(ctx context.Context, id string) error {
+	if r.failPurge {
+		return errors.New("injected purge database error")
+	}
+	return r.MockMediaFileRepo.PurgeTrashed(ctx, id)
 }
 
 func (r *trashTestRepository) SetTrashed(ctx context.Context, id string, trashed bool) error {
@@ -37,7 +45,11 @@ type trashTestStore struct {
 }
 
 func (s *trashTestStore) WithTxImmediate(block func(model.DataStore) error, _ ...string) error {
-	before := *s.repo.Data["song"]
+	before := make(map[string]*model.MediaFile, len(s.repo.Data))
+	for id, mf := range s.repo.Data {
+		clone := *mf
+		before[id] = &clone
+	}
 	err := block(s)
 	if err == nil && s.beforeCommit != nil {
 		s.beforeCommit()
@@ -46,7 +58,7 @@ func (s *trashTestStore) WithTxImmediate(block func(model.DataStore) error, _ ..
 		err = errors.New("injected commit error")
 	}
 	if err != nil {
-		*s.repo.Data["song"] = before
+		s.repo.Data = before
 	}
 	return err
 }
@@ -149,6 +161,12 @@ func TestSongTrashRequiresAdminInService(t *testing.T) {
 			}
 			if _, err := f.service.Restore(tc.ctx, "invalid"); !errors.Is(err, tc.want) {
 				t.Fatalf("restore got %v", err)
+			}
+			if _, err := f.service.Purge(tc.ctx, "invalid"); !errors.Is(err, tc.want) {
+				t.Fatalf("purge got %v", err)
+			}
+			if _, err := f.service.Clear(tc.ctx, nil); !errors.Is(err, tc.want) {
+				t.Fatalf("clear got %v", err)
 			}
 		})
 	}
