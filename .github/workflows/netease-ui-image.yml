@@ -14,6 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend:
+    name: Validate song recovery and permissions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Test recovery, API access and library visibility
+        run: go test -count=1 -shuffle=on -tags netgo,sqlite_fts5 ./cmd/... ./core/... ./model/... ./persistence/... ./server/nativeapi/... ./scanner/...
+
   ui:
     name: Validate music interface
     runs-on: ubuntu-24.04
@@ -40,7 +52,7 @@ jobs:
 
   build:
     name: Build and smoke-test (${{ matrix.arch }})
-    needs: ui
+    needs: [ui, backend]
     if: github.ref == 'refs/heads/codex/netease-music-ui'
     permissions:
       contents: read

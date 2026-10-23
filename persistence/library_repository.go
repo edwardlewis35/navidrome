@@ -200,7 +200,7 @@ func (r *libraryRepository) RefreshStats(ctx context.Context, id int) error {
 
 	err := run.Parallel(
 		func() error {
-			return r.queryOne(ctx, Select("count(*) as count").From("media_file").Where(Eq{"library_id": id, "missing": false}), &songsRes)
+			return r.queryOne(ctx, Select("count(*) as count").From("media_file").Where(Eq{"library_id": id, "missing": false, "trashed": false}), &songsRes)
 		},
 		func() error {
 			return r.queryOne(ctx, Select("count(*) as count").From("album").Where(Eq{"library_id": id, "missing": false}), &albumsRes)
@@ -222,7 +222,7 @@ func (r *libraryRepository) RefreshStats(ctx context.Context, id int) error {
 				From("folder").Where(Eq{"library_id": id, "missing": false}), &filesRes)
 		},
 		func() error {
-			return r.queryOne(ctx, Select("count(*) as count").From("media_file").Where(Eq{"library_id": id, "missing": true}), &missingRes)
+			return r.queryOne(ctx, Select("count(*) as count").From("media_file").Where(Eq{"library_id": id, "missing": true, "trashed": false}), &missingRes)
 		},
 		func() error {
 			return r.queryOne(ctx, Select("ifnull(sum(size),0) as sum").From("album").Where(Eq{"library_id": id, "missing": false}), &sizeRes)

@@ -154,7 +154,7 @@ func (r *playlistRepository) resolvePercentageLimit(ctx context.Context, pls *mo
 		return nil
 	}
 
-	countSq := Select("count(*) as count").From("media_file")
+	countSq := Select("count(*) as count").From("media_file").Where(Eq{"media_file.trashed": false})
 	countSq = rulesSQL.applyExpressionJoins(countSq, userID)
 	countSq = r.applyLibraryFilter(ctx, countSq, "media_file")
 
@@ -181,7 +181,7 @@ func (r *playlistRepository) resolvePercentageLimit(ctx context.Context, pls *mo
 func (r *playlistRepository) buildSmartPlaylistQuery(ctx context.Context, pls *model.Playlist, rulesSQL smartPlaylistCriteria, userID string) SelectBuilder {
 	orderBy := rulesSQL.orderBy()
 	sq := Select("row_number() over (order by "+orderBy+") as id", "'"+pls.ID+"' as playlist_id", "media_file.id as media_file_id").
-		From("media_file")
+		From("media_file").Where(Eq{"media_file.trashed": false})
 	sq = rulesSQL.applyRequiredJoins(sq, userID)
 	sq = r.applyLibraryFilter(ctx, sq, "media_file")
 	return sq

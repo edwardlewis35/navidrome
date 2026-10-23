@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/navidrome/navidrome/conf"
@@ -252,13 +254,75 @@ var _ = Describe("Song Endpoints", func() {
 		})
 
 		Context("DELETE /song/{id}", func() {
-			It("should not be available (songs are not persistable)", func() {
+			It("requires administrator privileges", func() {
 				req := createAuthenticatedRequest("DELETE", "/song/song-1", nil)
 				router.ServeHTTP(w, req)
 
-				// Should return 405 Method Not Allowed or 404 Not Found
-				Expect(w.Code).To(Equal(http.StatusMethodNotAllowed))
+				Expect(w.Code).To(Equal(http.StatusForbidden))
 			})
+		})
+	})
+
+	Describe("Administrator song trash endpoints", func() {
+		for _, endpoint := range []struct{ method, path string }{
+			{http.MethodDelete, "/song/song-1"},
+			{http.MethodGet, "/trash"},
+			{http.MethodPost, "/trash/00000000-0000-0000-0000-000000000000/restore"},
+		} {
+			It("rejects unauthenticated "+endpoint.method+" "+endpoint.path, func() {
+				router.ServeHTTP(w, createUnauthenticatedRequest(endpoint.method, endpoint.path, nil))
+				Expect(w.Code).To(Equal(http.StatusUnauthorized))
+			})
+			It("rejects non-admin "+endpoint.method+" "+endpoint.path, func() {
+				router.ServeHTTP(w, createAuthenticatedRequest(endpoint.method, endpoint.path, []byte(`{"isAdmin":true}`)))
+				Expect(w.Code).To(Equal(http.StatusForbidden))
+				Expect(mfRepo.Data).To(HaveLen(2))
+			})
+		}
+
+		It("allows an administrator to move an isolated file and restore it", func() {
+			base := GinkgoT().TempDir()
+			music, data := filepath.Join(base, "music"), filepath.Join(base, "data")
+			Expect(os.Mkdir(music, 0755)).To(Succeed())
+			Expect(os.Mkdir(data, 0700)).To(Succeed())
+			fixture := []byte("isolated native API fixture, never live music")
+			Expect(os.WriteFile(filepath.Join(music, "fixture.mp3"), fixture, 0644)).To(Succeed())
+			conf.Server.DataFolder = conf.NewDir(data)
+			libs := &tests.MockLibraryRepo{}
+			libs.SetData(model.Libraries{{ID: 1, Path: music}})
+			ds.MockedLibrary = libs
+			mfRepo.Data["song-1"].Path = "fixture.mp3"
+			mfRepo.Data["song-1"].LibraryID = 1
+			testUser.IsAdmin = true
+			Expect(userRepo.Put(ctx, &testUser)).To(Succeed())
+			// Create the service after selecting this test's independent data directory.
+			router = server.JWTVerifier(New(ds, nil, playlists.NewPlaylists(ds, nil), nil, tests.NewMockLibraryService(), tests.NewMockUserService(), nil, nil, nil, nil, nil))
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodDelete, "/song/song-1", nil))
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+			var deleted struct{ ID, TrashID string }
+			Expect(json.Unmarshal(w.Body.Bytes(), &deleted)).To(Succeed())
+			Expect(deleted.ID).To(Equal("song-1"))
+			Expect(deleted.TrashID).ToNot(BeEmpty())
+			Expect(filepath.Join(music, "fixture.mp3")).ToNot(BeAnExistingFile())
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodGet, "/trash", nil))
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+			var entries []map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &entries)).To(Succeed())
+			Expect(entries).To(HaveLen(1))
+			Expect(entries[0]["id"]).To(Equal(deleted.TrashID))
+			Expect(entries[0]).ToNot(HaveKey("libraryRoot"))
+			Expect(entries[0]).ToNot(HaveKey("sha256"))
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodPost, "/trash/"+deleted.TrashID+"/restore", nil))
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+			actual, err := os.ReadFile(filepath.Join(music, "fixture.mp3"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(actual).To(Equal(fixture))
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, createAuthenticatedRequest(http.MethodGet, "/trash", nil))
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Body.String()).To(MatchJSON(`[]`))
 		})
 	})
 

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	ppl "github.com/google/go-pipeline/pkg/pipeline"
+	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
+	"github.com/navidrome/navidrome/core"
 	"github.com/navidrome/navidrome/core/playlists"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -65,6 +67,10 @@ func (s *scannerImpl) scanFolders(ctx context.Context, fullScan bool, targets []
 		progress:        progress,
 		fullScan:        fullScan,
 		changesDetected: atomic.Bool{},
+	}
+	if err := core.NewSongTrash(s.ds, conf.Server.DataFolder.String()).Recover(ctx); err != nil {
+		state.sendError(fmt.Errorf("recovering administrator song trash before scan: %w", err))
+		return
 	}
 
 	// Set changesDetected to true for full scans to ensure all maintenance operations run

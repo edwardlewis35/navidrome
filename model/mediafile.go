@@ -100,6 +100,7 @@ type MediaFile struct {
 	Tags         Tags         `structs:"tags" json:"tags,omitempty" hash:"ignore"`       // All imported tags from the original file
 	Participants Participants `structs:"participants" json:"participants" hash:"ignore"` // All artists that participated in this track
 
+	Trashed   bool      `structs:"trashed" json:"-" hash:"ignore"`            // Retain metadata while the original file is in the administrator's trash
 	Missing   bool      `structs:"missing" json:"missing" hash:"ignore"`      // If the file is not found in the library's FS
 	BirthTime time.Time `structs:"birth_time" json:"birthTime" hash:"ignore"` // Time of file creation (ctime)
 	CreatedAt time.Time `structs:"created_at" json:"createdAt" hash:"ignore"` // Time this entry was created in the DB
@@ -545,6 +546,7 @@ type MediaFileRepository interface {
 	Exists(ctx context.Context, id string) (bool, error)
 	Put(ctx context.Context, m *MediaFile) error
 	UpdateProbeData(ctx context.Context, id string, data string) error
+	SetTrashed(ctx context.Context, id string, trashed bool) error
 	Get(ctx context.Context, id string) (*MediaFile, error)
 	GetWithParticipants(ctx context.Context, id string) (*MediaFile, error)
 	GetAll(ctx context.Context, options ...QueryOptions) (MediaFiles, error)

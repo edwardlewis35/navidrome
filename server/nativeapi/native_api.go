@@ -68,7 +68,7 @@ func (api *Router) routes() http.Handler {
 		r.Use(server.JWTRefresher)
 		r.Use(server.UpdateLastAccessMiddleware(api.ds))
 		rx(r, "/user", api.users.Repository(), true)
-		rx(r, "/song", api.ds.MediaFile(), false)
+		api.addSongTrashRoutes(r)
 		rx(r, "/album", api.ds.Album(), false)
 		api.addArtistRoute(r)
 		rx(r, "/genre", api.ds.Genre(), false)
