@@ -77,13 +77,13 @@ func newSongTrashFixture(t *testing.T) *songTrashFixture {
 	t.Helper()
 	base := t.TempDir()
 	f := &songTrashFixture{music: filepath.Join(base, "music"), data: filepath.Join(base, "data"), path: filepath.Join("artist", "album", "track.mp3"), content: []byte("isolated test song; never production music")}
-	if err := os.MkdirAll(filepath.Join(f.music, "artist", "album"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(f.music, "artist", "album"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Mkdir(f.data, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(f.music, f.path), f.content, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.music, f.path), f.content, 0600); err != nil {
 		t.Fatal(err)
 	}
 	repo := &trashTestRepository{MockMediaFileRepo: tests.CreateMockMediaFileRepo()}
@@ -190,7 +190,7 @@ func TestSongTrashRejectsPathsAndSymlinks(t *testing.T) {
 	t.Run("symlink file", func(t *testing.T) {
 		f := newSongTrashFixture(t)
 		outside := filepath.Join(t.TempDir(), "outside.mp3")
-		if err := os.WriteFile(outside, f.content, 0644); err != nil {
+		if err := os.WriteFile(outside, f.content, 0600); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.Symlink(outside, filepath.Join(f.music, "linked.mp3")); err != nil {
@@ -277,7 +277,7 @@ func TestSongTrashRestoreNeverOverwritesAndRetainsRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	replacement := []byte("new occupant must survive")
-	if err := os.WriteFile(filepath.Join(f.music, f.path), replacement, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.music, f.path), replacement, 0600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.service.Restore(f.ctx, entry.ID); !errors.Is(err, ErrTrashConflict) {
@@ -292,7 +292,7 @@ func TestSongTrashDeleteRollbackKeepsPayloadWhenPathBecomesOccupied(t *testing.T
 	replacement := []byte("another writer occupied the original path")
 	f.ds.failCommit = true
 	f.ds.beforeCommit = func() {
-		if err := os.WriteFile(filepath.Join(f.music, f.path), replacement, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(f.music, f.path), replacement, 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -379,7 +379,7 @@ func TestSongTrashRecoversInterruptedTransitions(t *testing.T) {
 			}
 			j.State = "prepared"
 			if scenario != "deleted before journal finalize" {
-				if err := os.WriteFile(filepath.Join(f.music, f.path), f.content, 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(f.music, f.path), f.content, 0600); err != nil {
 					t.Fatal(err)
 				}
 				j.State = "restoring"

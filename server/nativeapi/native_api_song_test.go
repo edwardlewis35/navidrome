@@ -285,10 +285,10 @@ var _ = Describe("Song Endpoints", func() {
 		It("allows an administrator to move an isolated file and restore it", func() {
 			base := GinkgoT().TempDir()
 			music, data := filepath.Join(base, "music"), filepath.Join(base, "data")
-			Expect(os.Mkdir(music, 0755)).To(Succeed())
+			Expect(os.Mkdir(music, 0700)).To(Succeed())
 			Expect(os.Mkdir(data, 0700)).To(Succeed())
 			fixture := []byte("isolated native API fixture, never live music")
-			Expect(os.WriteFile(filepath.Join(music, "fixture.mp3"), fixture, 0644)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(music, "fixture.mp3"), fixture, 0600)).To(Succeed())
 			conf.Server.DataFolder = conf.NewDir(data)
 			libs := &tests.MockLibraryRepo{}
 			libs.SetData(model.Libraries{{ID: 1, Path: music}})
@@ -330,9 +330,9 @@ var _ = Describe("Song Endpoints", func() {
 		It("requires explicit confirmation before permanently deleting an isolated trash entry", func() {
 			base := GinkgoT().TempDir()
 			music, data := filepath.Join(base, "music"), filepath.Join(base, "data")
-			Expect(os.Mkdir(music, 0755)).To(Succeed())
+			Expect(os.Mkdir(music, 0700)).To(Succeed())
 			Expect(os.Mkdir(data, 0700)).To(Succeed())
-			Expect(os.WriteFile(filepath.Join(music, "fixture.mp3"), []byte("temporary purge fixture"), 0644)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(music, "fixture.mp3"), []byte("temporary purge fixture"), 0600)).To(Succeed())
 			conf.Server.DataFolder = conf.NewDir(data)
 			libs := &tests.MockLibraryRepo{}
 			libs.SetData(model.Libraries{{ID: 1, Path: music}})
