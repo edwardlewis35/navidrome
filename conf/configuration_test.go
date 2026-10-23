@@ -88,7 +88,7 @@ var _ = Describe("Configuration", func() {
 
 		It("never includes its raw value in the debug configuration dump", func() {
 			logFile := filepath.Join(GinkgoT().TempDir(), "configuration.log")
-			proxy := "http://private-user:private-password@proxy.example:7891"
+			proxy := "http://private-user:private-password@proxy.example:7891" // #nosec G101 -- Synthetic rejected proxy credential verifies that debug output redacts secrets.
 			viper.Set("logfile", logFile)
 			viper.Set("loglevel", "debug")
 			viper.Set("enablelogredacting", false)
