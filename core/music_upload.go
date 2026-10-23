@@ -91,16 +91,10 @@ func musicUploadHeader(name string, b []byte) bool {
 	}
 }
 
-type musicUploadReader struct {
-	ctx    context.Context
-	reader io.Reader
-}
+type musicUploadReader func([]byte) (int, error)
 
 func (r musicUploadReader) Read(b []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
-	}
-	return r.reader.Read(b)
+	return r(b)
 }
 
 func publishMusicUpload(ctx context.Context, root *os.Root, path string, input io.Reader, limit int64) (int64, error) {
@@ -127,8 +121,13 @@ func publishMusicUpload(ctx context.Context, root *os.Root, path string, input i
 	if err != nil {
 		return 0, err
 	}
-	defer destination.Remove(temp) // Only the unique unpublished staging name.
-	reader := io.LimitReader(musicUploadReader{ctx, input}, limit+1)
+	defer func() { _ = destination.Remove(temp) }() // Only the unique unpublished staging name.
+	reader := io.LimitReader(musicUploadReader(func(b []byte) (int, error) {
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		return input.Read(b)
+	}), limit+1)
 	header := make([]byte, 512)
 	n, readErr := io.ReadFull(reader, header)
 	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {

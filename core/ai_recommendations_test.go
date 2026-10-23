@@ -101,7 +101,7 @@ func TestAIMusicRejectsUnsafeEndpointAndCredentials(t *testing.T) {
 		}
 	}
 	svc, _, ctx := aiFixture(t)
-	if _, err := svc.UpdateSettings(ctx, AIMusicSettingsUpdate{Endpoint: "https://ai.example/v1", Model: "model", APIKey: "key\r\nheader: injected"}); !errors.Is(err, ErrAIInvalidSettings) {
+	if _, err := svc.UpdateSettings(ctx, AIMusicSettingsUpdate{Endpoint: "https://ai.example/v1", Model: "model", APIKey: "key\r\nheader: injected"}); !errors.Is(err, ErrAIInvalidSettings) { // #nosec G101 -- Deliberately invalid synthetic CRLF credential for validation.
 		t.Fatal("accepted newline in credential")
 	}
 	if _, err := svc.UpdateSettings(ctx, AIMusicSettingsUpdate{Enabled: true}); !errors.Is(err, ErrAIInvalidSettings) {
