@@ -60,9 +60,15 @@ docker compose -f docker-compose.netease.yml up -d
 
 没有保存过页面设置时，采用服务器环境变量 `ND_ONLINECOVERPROXY` 作为默认值。只代理服务器的在线封面搜索和下载，不改变 AI 或播放请求的网络。代理只支持不带认证、路径、参数或片段且有显式端口的 HTTP/HTTPS 地址。完整限制见 [ONLINE_COVER_API.md](ONLINE_COVER_API.md)。
 
+## 英语网络电台
+
+侧栏“英语电台”提供 Heart London、LBC News UK 和 Classic FM 的官方公开 MP3 连续音频流，涵盖伦敦流行音乐、英国新闻和古典音乐。页面提供电台来源链接；仅点击播放时才建立音频连接，使用本站底部播放器收听。
+
+管理员可在电台页面设置独立的 HTTP/HTTPS 代理，例如 `http://proxy.example:7891`。保存后对新启动的播放生效，重启后保留，留空表示直连。此代理只用于预设电台音频，与封面代理和 AI 设置独立。接口与音源说明见 [ENGLISH_RADIO_API.md](ENGLISH_RADIO_API.md)。
+
 ## 精简入口和客户端兼容
 
-移除网页中的网络电台、Last.fm 和插件入口，默认关闭 Last.fm 与插件运行；关于页面显示当前版本、服务信息和本分支链接。搜索框与侧栏留有独立间距，歌单子项按当前歌单同步高亮。
+网页提供英语电台入口，移除 Last.fm 和插件入口，默认关闭 Last.fm 与插件运行；关于页面显示当前版本、服务信息和本分支链接。搜索框与侧栏留有独立间距，歌单子项按当前歌单同步高亮，桌面侧栏背景与菜单保持固定。
 
 保留 Subsonic / OpenSubsonic 的认证、曲库查询、播放、封面和歌单核心接口，兼容 Amcfy Music 等现有客户端。新增管理功能使用 `/api` 接口，不改变播放接口的参数或响应协议。
 

@@ -13,6 +13,7 @@ import LibrarySelector from '../common/LibrarySelector'
 import config from '../config'
 import TrashMenuItem from '../trash/TrashMenuItem'
 import AdminMusicMenuItems from './AdminMusicMenuItems'
+import EnglishRadioMenuItem from '../radio/EnglishRadioMenuItem'
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -134,6 +135,11 @@ const Menu = ({ dense = false }) => {
         )}
       </SubMenu>
       {resources.filter(subItems(undefined)).map(renderResourceMenuItemLink)}
+      <EnglishRadioMenuItem
+        sidebarIsOpen={open}
+        activeClassName={classes.active}
+        dense={dense}
+      />
       {config.devSidebarPlaylists && open ? (
         <>
           <Divider />

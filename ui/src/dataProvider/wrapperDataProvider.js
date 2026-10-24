@@ -5,6 +5,7 @@ import { createAIDataProvider } from './aiDataProvider'
 import { createSongManagementProvider } from './songManagementProvider'
 import { createOnlineCoverProvider } from './onlineCoverProvider'
 import { createCoverSettingsProvider } from './coverSettingsProvider'
+import { createEnglishRadioProvider } from './englishRadioProvider'
 
 const dataProvider = jsonServerProvider(REST_URL, httpClient)
 
@@ -164,6 +165,7 @@ const wrapperDataProvider = {
   ...createSongManagementProvider(httpClient),
   ...createOnlineCoverProvider(httpClient),
   ...createCoverSettingsProvider(httpClient),
+  ...createEnglishRadioProvider(httpClient),
   getList: (resource, params) => {
     const [r, p] = mapResource(resource, params)
     return dataProvider.getList(r, p)
