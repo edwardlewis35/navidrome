@@ -19,6 +19,7 @@ import useMusicText from './useMusicText'
 import config from '../config'
 import TrashMenuItem from '../trash/TrashMenuItem'
 import AdminMusicMenuItems from './AdminMusicMenuItems'
+import EnglishRadioMenuItem from '../radio/EnglishRadioMenuItem'
 
 const useStyles = makeStyles({
   root: {
@@ -87,6 +88,10 @@ export default function MusicMenu() {
       {item('/album/recentlyPlayed', text.recentlyPlayed, <History />)}
       {item('/playlist', text.playlists, <QueueMusic />, true)}
       {config.enableSharing && item('/share', text.shares, <ShareOutlined />)}
+      <EnglishRadioMenuItem
+        sidebarIsOpen={open}
+        activeClassName={classes.active}
+      />
       <Divider />
       {open && <LibrarySelector />}
       {config.devSidebarPlaylists && open && (
