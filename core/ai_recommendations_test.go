@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -241,4 +242,182 @@ func TestAIMusicUnavailableAndAuthorizationDoNotCallProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 	release()
+}
+
+func TestAIMusicExternalRecommendationsAreBoundedAndSeparateFromPlayback(t *testing.T) {
+	svc, ds, ctx := aiFixture(t)
+	local, err := ds.MediaFile().Get(ctx, "candidate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := &aiProviderResult{ExternalRecommendations: []AIExternalRecommendation{
+		{Title: " source song ", Artist: "SOURCE ARTIST", Reason: "already in source"},
+		{Title: "Local song", Artist: "Local artist", Reason: "already a local candidate"},
+		{Title: "  Take Five  ", Artist: "The Dave Brubeck Quartet", Reason: "  Rhythmic   jazz affinity  "},
+		{Title: "take five", Artist: "the dave brubeck quartet", Reason: "duplicate"},
+		{Title: "", Artist: "Incomplete"},
+		{Title: "Incomplete", Artist: "  "},
+		{Title: "Song\x00injection", Artist: "Invalid"},
+		{Title: strings.Repeat("界", 161), Artist: "Oversized"},
+		{Title: "Oversized artist", Artist: strings.Repeat("a", 161)},
+		{Title: "Control artist", Artist: "Artist\nnext"},
+	}}
+	for i := range 20 {
+		response.ExternalRecommendations = append(response.ExternalRecommendations, AIExternalRecommendation{
+			Title: fmt.Sprintf("External fixture %d", i), Artist: "Fixture artist", Reason: strings.Repeat("x", 600),
+		})
+	}
+	result, err := svc.bindRecommendations(ctx, model.User{ID: "admin", IsAdmin: true},
+		&AIRecommendations{Recommendations: []AIRecommendation{}, ExternalRecommendations: []AIExternalRecommendation{}},
+		response, map[string]model.MediaFile{"c1": *local},
+		[]aiTrack{{Title: "Source song", Artist: "Source artist"}})
+	if err != nil || len(result.Recommendations) != 0 || len(result.ExternalRecommendations) != aiExternalResultLimit {
+		t.Fatalf("external-only recommendations were not bounded separately: %+v %v", result, err)
+	}
+	if got := result.ExternalRecommendations[0]; got.Title != "Take Five" || got.Artist != "The Dave Brubeck Quartet" || got.Reason != "Rhythmic jazz affinity" {
+		t.Fatalf("external names and reasons not preserved safely: %+v", got)
+	}
+	if len(result.ExternalRecommendations[1].Reason) != 500 {
+		t.Fatal("external reason was not bounded")
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if string(fields["recommendations"]) != "[]" || strings.Contains(string(fields["externalRecommendations"]), `"id"`) || strings.Contains(string(fields["externalRecommendations"]), `"streamUrl"`) {
+		t.Fatal("external recommendations pretended to be playable local tracks")
+	}
+}
+
+func TestAIMusicExternalRecommendationsWorkWithoutLocalCandidates(t *testing.T) {
+	svc, ds, admin := aiFixture(t)
+	ds.MockedMediaFile.(*tests.MockMediaFileRepo).SetData(model.MediaFiles{
+		{ID: "source", LibraryID: 1, Title: "Source song", Artist: "Source artist"},
+	})
+	var calls int
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var payload struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || len(payload.Messages) != 2 {
+			t.Error("invalid provider request")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var input struct {
+			Source     []aiTrack `json:"source"`
+			Candidates []aiTrack `json:"candidates"`
+		}
+		if err := json.Unmarshal([]byte(payload.Messages[1].Content), &input); err != nil || len(input.Source) != 1 || len(input.Candidates) != 0 || !strings.Contains(payload.Messages[0].Content, "externalRecommendations") {
+			t.Error("external-only prompt lost its authorized source or schema")
+		}
+		content := `{"analysis":"Jazz preferences","recommendations":[],"externalRecommendations":[{"title":"So What","artist":"Miles Davis","reason":"Modal jazz beyond the local library"}]}`
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": content}}}})
+	}))
+	defer provider.Close()
+	if _, err := svc.UpdateSettings(admin, AIMusicSettingsUpdate{Enabled: true, Endpoint: provider.URL, Model: "fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	user := request.WithUser(t.Context(), model.User{ID: "user", Libraries: model.Libraries{{ID: 1}}})
+	result, err := svc.Recommend(user, "playlist")
+	if err != nil || calls != 1 || result.CandidateCount != 0 || len(result.Recommendations) != 0 || len(result.ExternalRecommendations) != 1 || result.ExternalRecommendations[0].Title != "So What" || result.ExternalRecommendations[0].Artist != "Miles Davis" {
+		t.Fatalf("missing external recommendations without local candidates: %+v %v", result, err)
+	}
+}
+
+type aiExternalLookupRepo struct {
+	model.MediaFileRepository
+	options []model.QueryOptions
+	rows    model.MediaFiles
+}
+
+func (r *aiExternalLookupRepo) GetAll(_ context.Context, options ...model.QueryOptions) (model.MediaFiles, error) {
+	r.options = append(r.options, options...)
+	return r.rows, nil
+}
+
+func TestAIMusicExternalRecommendationsExcludeUnpooledAuthorizedLibraryMatches(t *testing.T) {
+	for _, libraryID := range []int{1, 2} {
+		t.Run(fmt.Sprintf("library-%d", libraryID), func(t *testing.T) {
+			svc, ds, ctx := aiFixture(t)
+			repo := &aiExternalLookupRepo{MediaFileRepository: ds.MediaFile(), rows: model.MediaFiles{
+				{ID: "unpooled", Title: "Outside candidate pool", Artist: "Fixture artist", LibraryID: libraryID},
+			}}
+			ds.MockedMediaFile = repo
+			user := model.User{ID: "user", Libraries: model.Libraries{{ID: 1}}}
+			response := &aiProviderResult{ExternalRecommendations: []AIExternalRecommendation{
+				{Title: "Outside candidate pool", Artist: "Fixture artist", Reason: "model suggestion"},
+			}}
+			result, err := svc.bindRecommendations(ctx, user,
+				&AIRecommendations{Recommendations: []AIRecommendation{}, ExternalRecommendations: []AIExternalRecommendation{}},
+				response, map[string]model.MediaFile{}, []aiTrack{})
+			if libraryID == 1 {
+				if !errors.Is(err, ErrAIInvalidResponse) {
+					t.Fatal("existing local track outside sampled pool was shown as external")
+				}
+			} else if err != nil || len(result.ExternalRecommendations) != 1 {
+				t.Fatal("inaccessible library match leaked by removing an external suggestion")
+			}
+			if len(repo.options) != 1 || repo.options[0].Max != 1 {
+				t.Fatal("external match query must return at most one row")
+			}
+			sql, args, err := repo.options[0].Filters.ToSql()
+			if err != nil || !strings.Contains(sql, "media_file.library_id IN (?)") || !strings.Contains(sql, "media_file.missing") || !strings.Contains(sql, "media_file.trashed") || len(args) != 5 || args[4] != 1 {
+				t.Fatalf("external lookup escaped authorized active library: %s %#v %v", sql, args, err)
+			}
+		})
+	}
+}
+
+func TestAIMusicExternalLookupWorkIsBounded(t *testing.T) {
+	svc, ds, ctx := aiFixture(t)
+	repo := &aiExternalLookupRepo{MediaFileRepository: ds.MediaFile(), rows: model.MediaFiles{
+		{Title: "Already local", Artist: "Fixture artist", LibraryID: 1},
+	}}
+	ds.MockedMediaFile = repo
+	response := &aiProviderResult{}
+	for i := range aiExternalScanLimit + 20 {
+		response.ExternalRecommendations = append(response.ExternalRecommendations,
+			AIExternalRecommendation{Title: fmt.Sprintf("Suggestion %d", i), Artist: "Fixture artist"})
+	}
+	// Return each requested name as an existing local record so no results fill
+	// the output cap before the separate input-work limit is reached.
+	repo.rows = nil
+	for _, pick := range response.ExternalRecommendations {
+		repo.rows = append(repo.rows, model.MediaFile{Title: pick.Title, Artist: pick.Artist, LibraryID: 1})
+	}
+	_, err := svc.bindRecommendations(ctx, model.User{ID: "admin", IsAdmin: true},
+		&AIRecommendations{Recommendations: []AIRecommendation{}, ExternalRecommendations: []AIExternalRecommendation{}},
+		response, map[string]model.MediaFile{}, []aiTrack{})
+	if !errors.Is(err, ErrAIInvalidResponse) || len(repo.options) != aiExternalScanLimit {
+		t.Fatalf("unbounded external lookup work: %d queries, %v", len(repo.options), err)
+	}
+}
+
+func TestAIMusicRejectsExternalPlaybackURLsAndUnusableNames(t *testing.T) {
+	for _, content := range []string{
+		`{"recommendations":[],"externalRecommendations":[{"title":"Song","artist":"Artist","reason":"test","streamUrl":"https://example.com/audio"}]}`,
+		`{"recommendations":[],"externalRecommendations":[{"title":"","artist":"Artist","reason":"test"}]}`,
+	} {
+		t.Run(content[:30], func(t *testing.T) {
+			svc, _, ctx := aiFixture(t)
+			provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": content}}}})
+			}))
+			defer provider.Close()
+			if _, err := svc.UpdateSettings(ctx, AIMusicSettingsUpdate{Enabled: true, Endpoint: provider.URL, Model: "fixture"}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := svc.Recommend(ctx, "playlist"); !errors.Is(err, ErrAIInvalidResponse) {
+				t.Fatalf("unsafe or empty external recommendation accepted: %v", err)
+			}
+		})
+	}
 }

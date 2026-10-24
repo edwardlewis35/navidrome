@@ -4,7 +4,7 @@ const en = {
   title: 'AI music',
   discoverTitle: 'A new direction for your playlist',
   description:
-    'Let AI explore the sound of your playlist and recommend songs from your library.',
+    'Let AI explore your playlist and recommend songs from your library and beyond.',
   privacy:
     'On your request, playlist names and song titles, artists, albums and genres are sent to your configured AI provider. Audio files, file paths and account details stay here.',
   settings: 'AI settings',
@@ -35,9 +35,13 @@ const en = {
   noPlaylists:
     'Create a playlist with a few songs to discover recommendations.',
   noCandidates:
-    'There are no other playable songs to recommend. Add more music to your library.',
+    'There are no other playable songs in these local recommendations.',
   analysis: 'Your musical taste',
   recommendations: 'Recommended from your library',
+  externalRecommendations: 'Discover more songs',
+  externalHelp: 'Song titles and artists to look up on your music service.',
+  noExternalRecommendations:
+    'No external recommendations were returned this time.',
   play: 'Play',
   sampled:
     'Recommendations use up to 80 playlist songs and a sample of 200 accessible library songs.',
@@ -47,7 +51,8 @@ const en = {
   busy: 'AI music is busy. Please wait about 30 seconds and try again.',
   provider_unavailable:
     'Could not connect to the AI provider. Check the settings or try again.',
-  invalid_response: 'AI did not return usable local songs. Please try again.',
+  invalid_response:
+    'AI did not return usable song recommendations. Please try again.',
   playlist_not_found:
     'This playlist is unavailable. Please choose another playlist.',
   ai_error: 'Could not generate recommendations. Please try again.',
@@ -56,7 +61,7 @@ const en = {
 const zh = {
   title: 'AI 音乐',
   discoverTitle: '从你的歌单，发现新的心动',
-  description: '让 AI 分析歌单的音乐偏好，从本地曲库推荐适合你的歌曲。',
+  description: '让 AI 分析歌单的音乐偏好，推荐本地歌曲和更多值得发现的音乐。',
   privacy:
     '点击分析后，将向你配置的 AI 服务发送歌单名，以及歌曲的标题、歌手、专辑和曲风。音频文件、文件路径和账号信息不会发送。',
   settings: 'AI 设置',
@@ -84,9 +89,12 @@ const zh = {
   analyze: '分析歌单并推荐',
   analyzing: '正在分析你的音乐偏好…',
   noPlaylists: '先创建一个歌单，放入几首喜欢的歌，再来发现推荐。',
-  noCandidates: '暂无其他可推荐的歌曲，向曲库添加更多音乐后再试。',
+  noCandidates: '这次暂无可播放的本地推荐。',
   analysis: '你的音乐偏好',
   recommendations: '为你推荐 · 本地曲库',
+  externalRecommendations: '为你推荐 · 曲库之外',
+  externalHelp: '提供歌名和歌手，方便你在音乐服务中查找。',
+  noExternalRecommendations: '这次未返回外部歌曲推荐。',
   play: '播放',
   sampled:
     '每次分析最多参考歌单中的 80 首歌曲，并从可访问曲库中抽取 200 首歌曲作为推荐候选。',
@@ -94,7 +102,7 @@ const zh = {
   empty_playlist: '这个歌单中暂无你可以访问和播放的歌曲。',
   busy: 'AI 音乐正在处理中，请等待约 30 秒后重试。',
   provider_unavailable: '暂时无法连接 AI 服务，请检查设置或稍后重试。',
-  invalid_response: 'AI 未返回有效的本地歌曲推荐，请重试。',
+  invalid_response: 'AI 未返回有效的歌曲推荐，请重试。',
   playlist_not_found: '该歌单已不可用，请重新选择。',
   ai_error: '暂时无法生成推荐，请重试。',
 }

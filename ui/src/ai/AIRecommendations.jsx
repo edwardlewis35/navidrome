@@ -308,6 +308,49 @@ export default function AIRecommendations() {
                     {text.noCandidates}
                   </Typography>
                 )}
+                <Typography
+                  component="h3"
+                  variant="subtitle1"
+                  className={classes.status}
+                >
+                  {text.externalRecommendations}
+                </Typography>
+                <Typography className={classes.privacy}>
+                  {text.externalHelp}
+                </Typography>
+                {result.externalRecommendations?.length ? (
+                  <ul className={classes.list}>
+                    {result.externalRecommendations.map(
+                      ({ title, artist, reason }) => (
+                        <li
+                          key={JSON.stringify([title, artist])}
+                          className={classes.song}
+                        >
+                          <div className={classes.info}>
+                            <Typography
+                              component="h4"
+                              className={classes.songTitle}
+                            >
+                              {title}
+                            </Typography>
+                            <Typography className={classes.artist}>
+                              {artist}
+                            </Typography>
+                            {reason && (
+                              <Typography className={classes.reason}>
+                                {reason}
+                              </Typography>
+                            )}
+                          </div>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                ) : (
+                  <Typography className={classes.status}>
+                    {text.noExternalRecommendations}
+                  </Typography>
+                )}
               </div>
             )}
           </>

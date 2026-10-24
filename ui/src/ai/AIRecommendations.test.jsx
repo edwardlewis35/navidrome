@@ -160,4 +160,70 @@ describe('AI music recommendations', () => {
       expect(screen.getByText(/Create a playlist/)).toBeInTheDocument(),
     )
   })
+
+  it('shows external titles, artists and reasons alongside playable local songs', async () => {
+    const original = await mocks.provider.getAIRecommendations()
+    mocks.provider.getAIRecommendations.mockResolvedValue({
+      data: {
+        ...original.data,
+        externalRecommendations: [
+          {
+            title: 'Come Away With Me',
+            artist: 'Norah Jones',
+            reason: 'Gentle piano and warm vocals',
+          },
+        ],
+      },
+    })
+    vi.clearAllMocks()
+    renderCard()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Analyze and recommend' }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Discover more songs' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Come Away With Me' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Norah Jones')).toBeInTheDocument()
+    expect(screen.getByText('Gentle piano and warm vocals')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Play Local song' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Play Come Away With Me' }),
+    ).toBeNull()
+    expect(mocks.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('supports external recommendations when there are no local candidates and renders generated markup only as text', async () => {
+    mocks.provider.getAIRecommendations.mockResolvedValue({
+      data: {
+        analysis: 'Acoustic songwriting',
+        recommendations: [],
+        externalRecommendations: [
+          {
+            title: '<script>new song</script>',
+            artist: '<b>New artist</b>',
+            reason: '<a href="https://unexpected.example">reason</a>',
+          },
+        ],
+      },
+    })
+    renderCard()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Analyze and recommend' }),
+    )
+    expect(
+      await screen.findByText('<script>new song</script>'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('<b>New artist</b>')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'reason' })).toBeNull()
+    expect(document.querySelector('script')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Play / })).toBeNull()
+    expect(mocks.provider.getAIRecommendations).toHaveBeenCalledExactlyOnceWith(
+      'playlist',
+    )
+  })
 })
