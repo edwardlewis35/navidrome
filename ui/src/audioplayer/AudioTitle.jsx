@@ -48,7 +48,7 @@ const AudioTitle = React.memo(({ audioInfo, gainInfo, isMobile }) => {
   const title = song.title + (subtitle ? ` (${subtitle})` : '')
 
   const linkTo = audioInfo.isRadio
-    ? `/radio/${audioInfo.trackId}/show`
+    ? '/radio'
     : song.playlistId
       ? `/playlist/${song.playlistId}/show`
       : `/album/${song.albumId}/show`

@@ -13,14 +13,7 @@ import {
   UrlField,
   useTranslate,
 } from 'react-admin'
-import {
-  DateField,
-  List,
-  defaultRowsPerPageOptions,
-  getStoredPerPage,
-  ToggleFieldsMenu,
-  useSelectedFields,
-} from '../common'
+import { DateField, List, ToggleFieldsMenu, useSelectedFields } from '../common'
 import { Artwork } from '../common/Artwork'
 import { StreamField } from './StreamField'
 import { setTrack } from '../actions'
@@ -153,11 +146,6 @@ const RadioList = ({ permissions, ...props }) => {
       hasCreate={isAdmin}
       actions={<RadioListActions isAdmin={isAdmin} />}
       filters={<RadioFilter />}
-      perPage={getStoredPerPage(
-        'radio',
-        defaultRowsPerPageOptions,
-        isXsmall ? 25 : 10,
-      )}
     >
       {isXsmall ? (
         <SimpleList

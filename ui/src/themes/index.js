@@ -12,6 +12,7 @@ import CatppuccinFrappeTheme from './catppuccinFrappe'
 import CatppuccinMacchiatoTheme from './catppuccinMacchiato'
 import CatppuccinMochaTheme from './catppuccinMocha'
 import CatppuccinLatteTheme from './catppuccinLatte'
+import CloudMusicTheme from './cloudMusic'
 import DraculaTheme from './dracula'
 import NuclearTheme from './nuclear'
 import NutballTheme from './nutball'
@@ -40,6 +41,7 @@ export default {
   CatppuccinLatteTheme,
   CatppuccinMacchiatoTheme,
   CatppuccinMochaTheme,
+  CloudMusicTheme,
   DraculaTheme,
   ElectricPurpleTheme,
   ExtraDarkTheme,

@@ -310,7 +310,7 @@ func (r *playlistRepository) addTracks(ctx context.Context, playlistId string, s
 func (r *playlistRepository) keepAccessible(ctx context.Context, mediaFileIds []string) ([]string, error) {
 	accessible := make(map[string]struct{}, len(mediaFileIds))
 	for chunk := range slices.Chunk(slice.Unique(mediaFileIds), 200) {
-		sq := r.applyLibraryFilter(ctx, Select("id").From("media_file").Where(Eq{"id": chunk}), "media_file")
+		sq := r.applyLibraryFilter(ctx, Select("id").From("media_file").Where(Eq{"id": chunk, "trashed": false}), "media_file")
 		var found []string
 		if err := r.queryAllSlice(ctx, sq, &found); err != nil {
 			return nil, err
@@ -334,7 +334,7 @@ func (r *playlistRepository) refreshCounters(ctx context.Context, pls *model.Pla
 	).
 		From("media_file").
 		Join("playlist_tracks f on f.media_file_id = media_file.id").
-		Where(Eq{"playlist_id": pls.ID})
+		Where(Eq{"playlist_id": pls.ID, "media_file.trashed": false})
 	var res struct{ Duration, Size, Count float32 }
 	err := r.queryOne(ctx, statsSql, &res)
 	if err != nil {
@@ -393,7 +393,7 @@ func (r *playlistRepository) tracksQuery(ctx context.Context, query SelectBuilde
 			" AND annotation.user_id = '" + userID + "')").
 		Join("media_file f on f.id = media_file_id").
 		Join("library on f.library_id = library.id").
-		Where(Eq{"playlist_id": id})
+		Where(Eq{"playlist_id": id, "f.trashed": false})
 }
 
 func (r *playlistRepository) loadTracks(ctx context.Context, query SelectBuilder, id string) (model.PlaylistTracks, error) {

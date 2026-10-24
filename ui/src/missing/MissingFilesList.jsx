@@ -1,11 +1,4 @@
-import {
-  DateField,
-  List,
-  Pagination,
-  SizeField,
-  getStoredPerPage,
-  useResourceRefresh,
-} from '../common/index'
+import { DateField, List, SizeField, useResourceRefresh } from '../common/index'
 import {
   Datagrid,
   TextField,
@@ -54,12 +47,6 @@ const BulkActionButtons = (props) => (
   </>
 )
 
-const missingPerPageOptions = [50, 100, 200]
-
-const MissingPagination = (props) => (
-  <Pagination rowsPerPageOptions={missingPerPageOptions} {...props} />
-)
-
 const MissingFilesList = (props) => {
   useResourceRefresh('song')
   return (
@@ -70,8 +57,6 @@ const MissingFilesList = (props) => {
       actions={<MissingListActions />}
       filters={<MissingFilesFilter />}
       bulkActionButtons={<BulkActionButtons />}
-      perPage={getStoredPerPage('missing', missingPerPageOptions)}
-      pagination={<MissingPagination />}
     >
       <Datagrid>
         <TextField source={'libraryName'} />

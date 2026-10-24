@@ -1,6 +1,5 @@
 import React from 'react'
 import {
-  ReferenceManyField,
   ShowContextProvider,
   useShowContext,
   useShowController,
@@ -10,7 +9,12 @@ import { makeStyles } from '@material-ui/core/styles'
 import AlbumSongs from './AlbumSongs'
 import AlbumDetails from './AlbumDetails'
 import AlbumActions from './AlbumActions'
-import { useResourceRefresh, useScrollRestoration, Title } from '../common'
+import {
+  ContinuousReferenceField as ReferenceManyField,
+  useResourceRefresh,
+  useScrollRestoration,
+  Title,
+} from '../common'
 
 const useStyles = makeStyles(
   (theme) => ({
@@ -41,8 +45,6 @@ const AlbumShowLayout = (props) => {
           reference="song"
           target="album_id"
           sort={{ field: 'album', order: 'ASC' }}
-          perPage={0}
-          pagination={null}
         >
           <AlbumSongs
             resource={'song'}

@@ -1,57 +1,105 @@
 import * as React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
-import { LinkToVersion } from './AboutDialog'
-import TableBody from '@material-ui/core/TableBody'
-import TableRow from '@material-ui/core/TableRow'
-import Table from '@material-ui/core/Table'
-import TableCell from '@material-ui/core/TableCell'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { AboutDialog, LinkToVersion } from './AboutDialog'
 
-const Wrapper = ({ version }) => (
-  <Table>
-    <TableBody>
-      <TableRow>
-        <TableCell>
-          <LinkToVersion version={version} />
-        </TableCell>
-      </TableRow>
-    </TableBody>
-  </Table>
-)
+const mocks = vi.hoisted(() => ({
+  ping: vi.fn(),
+  getOne: vi.fn(() => ({})),
+  permissions: 'admin',
+  locale: 'en',
+}))
+vi.mock('../subsonic', () => ({ default: { ping: mocks.ping } }))
+vi.mock('../config', () => ({
+  default: { version: '0.60.0 (123abcd)', devUIShowConfig: false },
+}))
+vi.mock('react-admin', async (original) => ({
+  ...(await original()),
+  useLocale: () => mocks.locale,
+  useTranslate: () => (key) => key,
+  usePermissions: () => ({ permissions: mocks.permissions }),
+  useGetOne: (...args) => mocks.getOne(...args),
+}))
 
-describe('<LinkToVersion />', () => {
+describe('version links', () => {
   afterEach(cleanup)
 
-  it('should not render any link for "dev" version', () => {
-    const version = 'dev'
-    render(<Wrapper version={version} />)
-    expect(screen.queryByRole('link')).toBeNull()
+  it.each(['dev', 'Cloud Music', '0.60.0', ''])(
+    'renders a plain version without a commit: %s',
+    (version) => {
+      render(<LinkToVersion version={version} />)
+      expect(screen.queryByRole('link')).toBeNull()
+    },
+  )
+
+  it.each(['0.40.0 (300a0292)', '0.40.0-SNAPSHOT (300a0292)'])(
+    'links the actual fork commit for %s',
+    (version) => {
+      render(<LinkToVersion version={version} />)
+      expect(screen.getByRole('link')).toHaveAttribute(
+        'href',
+        'https://github.com/edwardlewis35/navidrome/commit/300a0292',
+      )
+      expect(screen.getByRole('link')).toHaveTextContent(version)
+    },
+  )
+})
+
+describe('about this service', () => {
+  beforeEach(() => {
+    mocks.permissions = 'admin'
+    mocks.locale = 'en'
+    mocks.getOne.mockClear()
+    mocks.ping.mockReset().mockResolvedValue({
+      json: {
+        'subsonic-response': {
+          status: 'ok',
+          serverVersion: '0.60.0 (abcdef1)',
+        },
+      },
+    })
   })
 
-  it('should render link to GH tag page for full releases', () => {
-    const version = '0.40.0 (300a0292)'
-    render(<Wrapper version={version} />)
-
-    const link = screen.queryByRole('link')
-    expect(link.href).toBe(
-      'https://github.com/navidrome/navidrome/releases/tag/v0.40.0',
+  it('shows live status and deployed version with relevant project links', async () => {
+    render(<AboutDialog open onClose={() => {}} />)
+    await screen.findByText('Connected')
+    expect(
+      screen.getByRole('link', { name: '0.60.0 (abcdef1)' }),
+    ).toHaveAttribute(
+      'href',
+      'https://github.com/edwardlewis35/navidrome/commit/abcdef1',
     )
-    expect(link.textContent).toBe('0.40.0')
-
-    const cell = screen.queryByRole('cell')
-    expect(cell.textContent).toBe('0.40.0 (300a0292)')
+    expect(
+      screen.getByRole('link', { name: 'edwardlewis35/navidrome' }),
+    ).toHaveAttribute('href', 'https://github.com/edwardlewis35/navidrome')
+    expect(screen.getByText('Subsonic / OpenSubsonic')).toBeInTheDocument()
+    expect(
+      screen.queryByText(/ko-fi|deluan|reddit|lastInsightsCollection/i),
+    ).toBeNull()
+    expect(
+      mocks.getOne.mock.calls.some(([resource]) => resource === 'insights'),
+    ).toBe(false)
   })
 
-  it('should render link to GH comparison page for snapshot releases', () => {
-    const version = '0.40.0-SNAPSHOT (300a0292)'
-    render(<Wrapper version={version} />)
+  it('reports a failed connection without inventing a server version', async () => {
+    mocks.ping.mockRejectedValue(new Error('offline'))
+    render(<AboutDialog open onClose={() => {}} />)
+    await screen.findByText('Connection unavailable')
+    expect(screen.queryByRole('link', { name: '0.60.0 (abcdef1)' })).toBeNull()
+  })
 
-    const link = screen.queryByRole('link')
-    expect(link.href).toBe(
-      'https://github.com/navidrome/navidrome/compare/v0.40.0...300a0292',
-    )
-    expect(link.textContent).toBe('0.40.0-SNAPSHOT')
+  it('refreshes status when reopened', async () => {
+    const { rerender } = render(<AboutDialog open={false} onClose={() => {}} />)
+    expect(mocks.ping).not.toHaveBeenCalled()
+    rerender(<AboutDialog open onClose={() => {}} />)
+    await waitFor(() => expect(mocks.ping).toHaveBeenCalledTimes(1))
+  })
 
-    const cell = screen.queryByRole('cell')
-    expect(cell.textContent).toBe('0.40.0-SNAPSHOT (300a0292)')
+  it('localizes service information and hides administrator tools from regular users', async () => {
+    mocks.locale = 'zh-Hans'
+    mocks.permissions = 'user'
+    render(<AboutDialog open onClose={() => {}} />)
+    await screen.findByText('已连接')
+    expect(screen.getByText('Cloud Music 定制版')).toBeInTheDocument()
+    expect(screen.queryByText('管理员工具')).toBeNull()
   })
 })

@@ -12,6 +12,7 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/conf/configtest"
 	"github.com/navidrome/navidrome/consts"
+	"github.com/navidrome/navidrome/core/onlinecover"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/resources"
 	"github.com/navidrome/navidrome/tests"
@@ -111,6 +112,31 @@ var _ = Describe("Artwork", func() {
 	})
 
 	Describe("found state", func() {
+		It("serves a selected song cover before the artwork worker has created a state row", func() {
+			conf.Server.EnableMediaFileCoverArt = false
+			conf.Server.DataFolder = conf.NewDir(GinkgoT().TempDir())
+			Expect(mfRepo.Put(ctx, &model.MediaFile{ID: "custom-song", HasCoverArt: false})).To(Succeed())
+			Expect(onlinecover.Save("song", "custom-song", coverBytes)).To(Succeed())
+			img, err := svc.Get(ctx, model.MustParseArtworkID("mf-custom-song"), 0, false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(readAll(img)).To(Equal(coverBytes))
+			_, err = artRepo.GetItemArtwork(ctx, model.KindMediaFileArtwork, "custom-song", model.ImageTypePrimary)
+			Expect(err).To(MatchError(model.ErrNotFound), "read-through must not manufacture resolved state")
+		})
+
+		It("serves persisted selected song covers when embedded extraction is disabled", func() {
+			conf.Server.EnableMediaFileCoverArt = false
+			conf.Server.DataFolder = conf.NewDir(GinkgoT().TempDir())
+			Expect(mfRepo.Put(ctx, &model.MediaFile{ID: "custom-song", HasCoverArt: false})).To(Succeed())
+			Expect(onlinecover.Save("song", "custom-song", coverBytes)).To(Succeed())
+			path := onlinecover.Path("song", "custom-song")
+			Expect(artRepo.PutImage(ctx, &model.Artwork{Hash: "customcover11111", Mime: "image/jpeg"})).To(Succeed())
+			Expect(artRepo.PutItemArtwork(ctx, &model.ItemArtwork{ItemKind: "mf", ItemID: "custom-song", Hash: "customcover11111", Source: "upload", SourcePath: path, RefMtime: fileMtime(path)})).To(Succeed())
+			img, err := svc.Get(ctx, model.MustParseArtworkID("mf-custom-song"), 0, false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(readAll(img)).To(Equal(coverBytes))
+		})
+
 		It("serves a store-backed found image sized (cache miss resizes, second call is a cache hit)", func() {
 			seedFoundStore("al", "al1", coverBytes)
 

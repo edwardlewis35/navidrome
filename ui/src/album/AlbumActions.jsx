@@ -7,6 +7,8 @@ import {
   TopToolbar,
   useRecordContext,
   useTranslate,
+  useDataProvider,
+  useNotify,
 } from 'react-admin'
 import { useMediaQuery, makeStyles } from '@material-ui/core'
 import PlayArrowIcon from '@material-ui/icons/PlayArrow'
@@ -28,6 +30,7 @@ import {
 import { formatBytes } from '../utils'
 import config from '../config'
 import { RefreshMetadataButton, ToggleFieldsMenu } from '../common'
+import { getCompleteList } from '../common/getCompleteList'
 
 const useStyles = makeStyles({
   toolbar: { display: 'flex', justifyContent: 'space-between', width: '100%' },
@@ -36,7 +39,7 @@ const useStyles = makeStyles({
 const AlbumButton = ({ children, ...rest }) => {
   const record = useRecordContext(rest) || {}
   return (
-    <Button {...rest} disabled={record.missing}>
+    <Button {...rest} disabled={record.missing || rest.disabled}>
       {children}
     </Button>
   )
@@ -51,31 +54,74 @@ const AlbumActions = ({
   ...rest
 }) => {
   const dispatch = useDispatch()
+  const dataProvider = useDataProvider()
+  const notify = useNotify()
+  const [loading, setLoading] = React.useState(false)
+  const pending = React.useRef(false)
   const translate = useTranslate()
   const classes = useStyles()
   const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('md'))
   const isNotSmall = useMediaQuery((theme) => theme.breakpoints.up('sm'))
 
+  const dispatchAll = React.useCallback(
+    async (action) => {
+      if (pending.current) return
+      pending.current = true
+      setLoading(true)
+      try {
+        let allData = data
+        let allIds = ids
+        if (record.songCount && ids.length < record.songCount) {
+          const songs = await getCompleteList(dataProvider, 'song', {
+            sort: rest.currentSort || { field: 'album', order: 'ASC' },
+            filter: { album_id: record.id },
+          })
+          allData = Object.fromEntries(songs.map((song) => [song.id, song]))
+          allIds = songs.map((song) => song.id)
+        }
+        dispatch(action(allData, allIds))
+      } catch (error) {
+        notify('ra.page.error', 'warning')
+      } finally {
+        pending.current = false
+        setLoading(false)
+      }
+    },
+    [
+      data,
+      ids,
+      record.id,
+      record.songCount,
+      dataProvider,
+      dispatch,
+      notify,
+      rest.currentSort,
+    ],
+  )
+
   const handlePlay = React.useCallback(() => {
-    dispatch(playTracks(data, ids))
-  }, [dispatch, data, ids])
+    dispatchAll(playTracks)
+  }, [dispatchAll])
 
   const handlePlayNext = React.useCallback(() => {
-    dispatch(playNext(data, ids))
-  }, [dispatch, data, ids])
+    dispatchAll(playNext)
+  }, [dispatchAll])
 
   const handlePlayLater = React.useCallback(() => {
-    dispatch(addTracks(data, ids))
-  }, [dispatch, data, ids])
+    dispatchAll(addTracks)
+  }, [dispatchAll])
 
   const handleShuffle = React.useCallback(() => {
-    dispatch(shuffleTracks(data, ids))
-  }, [dispatch, data, ids])
+    dispatchAll(shuffleTracks)
+  }, [dispatchAll])
 
   const handleAddToPlaylist = React.useCallback(() => {
-    const selectedIds = ids.filter((id) => !data[id].missing)
-    dispatch(openAddToPlaylist({ selectedIds }))
-  }, [dispatch, data, ids])
+    dispatchAll((songs, songIds) =>
+      openAddToPlaylist({
+        selectedIds: songIds.filter((id) => !songs[id].missing),
+      }),
+    )
+  }, [dispatchAll])
 
   const handleShare = React.useCallback(() => {
     dispatch(openShareMenu([record.id], 'album', record.name))
@@ -90,30 +136,35 @@ const AlbumActions = ({
       <div className={classes.toolbar}>
         <div>
           <AlbumButton
+            disabled={loading}
             onClick={handlePlay}
             label={translate('resources.album.actions.playAll')}
           >
             <PlayArrowIcon />
           </AlbumButton>
           <AlbumButton
+            disabled={loading}
             onClick={handleShuffle}
             label={translate('resources.album.actions.shuffle')}
           >
             <ShuffleIcon />
           </AlbumButton>
           <AlbumButton
+            disabled={loading}
             onClick={handlePlayNext}
             label={translate('resources.album.actions.playNext')}
           >
             <RiPlayList2Fill />
           </AlbumButton>
           <AlbumButton
+            disabled={loading}
             onClick={handlePlayLater}
             label={translate('resources.album.actions.addToQueue')}
           >
             <RiPlayListAddFill />
           </AlbumButton>
           <AlbumButton
+            disabled={loading}
             onClick={handleAddToPlaylist}
             label={translate('resources.album.actions.addToPlaylist')}
           >

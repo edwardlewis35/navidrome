@@ -14,6 +14,11 @@ describe('themeReducer', () => {
     },
     { configTheme: 'Dark', expected: 'DarkTheme', description: 'is "Dark"' },
     {
+      configTheme: 'Cloud Music',
+      expected: 'CloudMusicTheme',
+      description: 'is "Cloud Music"',
+    },
+    {
       configTheme: 'NonExistent',
       expected: 'DarkTheme',
       description: 'is unrecognized',
@@ -29,4 +34,12 @@ describe('themeReducer', () => {
       expect(result).toBe(expected)
     },
   )
+
+  it('keeps an explicitly selected theme when the configured default changes', async () => {
+    vi.doMock('../config', () => ({
+      default: { defaultTheme: 'Cloud Music' },
+    }))
+    const { themeReducer } = await import('./themeReducer')
+    expect(themeReducer('DarkTheme', { type: 'UNKNOWN' })).toBe('DarkTheme')
+  })
 })

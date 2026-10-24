@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { useDispatch } from 'react-redux'
 import {
@@ -6,8 +6,21 @@ import {
   usePermissions,
   useTranslate,
   useDataProvider,
+  useRefresh,
 } from 'react-admin'
-import { IconButton, Menu, MenuItem } from '@material-ui/core'
+import {
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  IconButton,
+  Menu,
+  MenuItem,
+  Typography,
+} from '@material-ui/core'
 import { makeStyles } from '@material-ui/core/styles'
 import MoreVertIcon from '@material-ui/icons/MoreVert'
 import { MdQuestionMark } from 'react-icons/md'
@@ -27,11 +40,14 @@ import config from '../config'
 import { playSimilar } from './playbackActions.js'
 import { formatBytes } from '../utils'
 import { useRedirect } from 'react-admin'
+import { trashErrorMessage } from '../trash/trashErrorMessage'
+import OnlineCoverDialog from '../covers/OnlineCoverDialog'
 
 const useStyles = makeStyles({
   noWrap: {
     whiteSpace: 'nowrap',
   },
+  destructive: { color: '#d93636' },
 })
 
 const MoreButton = ({ record, onClick, info }) => {
@@ -68,10 +84,23 @@ export const SongContextMenu = ({
   const [playlistAnchorEl, setPlaylistAnchorEl] = useState(null)
   const [playlists, setPlaylists] = useState([])
   const [playlistsLoaded, setPlaylistsLoaded] = useState(false)
-  const { permissions } = usePermissions()
+  const { permissions, loading: permissionsLoading } = usePermissions()
   const redirect = useRedirect()
+  const refresh = useRefresh()
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [trashing, setTrashing] = useState(false)
+  const [trashError, setTrashError] = useState('')
+  const [trashMode, setTrashMode] = useState('trash')
+  const trashInFlight = useRef(false)
+  const [coverOpen, setCoverOpen] = useState(false)
 
   const options = {
+    matchCover: {
+      enabled:
+        permissions === 'admin' && !permissionsLoading && !record.missing,
+      label: translate('resources.musicManagement.matchCover'),
+      action: () => setCoverOpen(true),
+    },
     playNow: {
       enabled: true,
       label: translate('resources.song.actions.playNow'),
@@ -168,6 +197,75 @@ export const SongContextMenu = ({
         dispatch(openExtendedInfoDialog(fullRecord))
       },
     },
+    moveToTrash: {
+      enabled:
+        permissions === 'admin' &&
+        !permissionsLoading &&
+        Boolean(record.mediaFileId || record.id) &&
+        !record.missing,
+      label: translate('resources.trash.moveToTrash'),
+      action: () => {
+        setTrashError('')
+        setTrashMode('trash')
+        setTrashOpen(true)
+      },
+    },
+    permanentlyDelete: {
+      enabled:
+        permissions === 'admin' &&
+        !permissionsLoading &&
+        Boolean(record.mediaFileId || record.id) &&
+        !record.missing,
+      label: translate('resources.musicManagement.deleteOne'),
+      action: () => {
+        setTrashError('')
+        setTrashMode('permanent')
+        setTrashOpen(true)
+      },
+    },
+  }
+
+  const confirmTrash = async () => {
+    if (permissions !== 'admin' || permissionsLoading || trashInFlight.current)
+      return
+    trashInFlight.current = true
+    setTrashing(true)
+    setTrashError('')
+    try {
+      if (trashMode === 'permanent') {
+        const { data } = await dataProvider.manageSongs(
+          [record.mediaFileId || record.id],
+          'permanent',
+        )
+        notify(
+          translate(
+            data.completed === 1
+              ? 'resources.musicManagement.deleted'
+              : data.results?.[0]?.status === 'pending'
+                ? 'resources.musicManagement.pending'
+                : 'resources.musicManagement.failed',
+          ),
+          {
+            type: data.completed === 1 ? 'info' : 'warning',
+            multiLine: true,
+            duration: 10000,
+          },
+        )
+      } else {
+        await dataProvider.moveSongToTrash(record.mediaFileId || record.id)
+        notify(translate('resources.trash.moved'), { type: 'info' })
+      }
+      setTrashOpen(false)
+      refresh()
+    } catch (error) {
+      setTrashError(
+        trashErrorMessage(error, translate('resources.trash.moveFailed')),
+      )
+      if (trashMode === 'permanent') refresh()
+    } finally {
+      trashInFlight.current = false
+      setTrashing(false)
+    }
   }
 
   const handleClick = (e) => {
@@ -197,7 +295,7 @@ export const SongContextMenu = ({
 
   const handleItemClick = (e) => {
     e.preventDefault()
-    const key = e.target.getAttribute('value')
+    const key = e.currentTarget.getAttribute('value')
     const action = options[key].action
 
     if (key === 'showInPlaylist') {
@@ -240,6 +338,15 @@ export const SongContextMenu = ({
 
   return (
     <span className={clsx(classes.noWrap, className)}>
+      {coverOpen && permissions === 'admin' && (
+        <OnlineCoverDialog
+          kind="song"
+          id={record.mediaFileId || record.id}
+          initialQuery={record.album || record.title}
+          open={coverOpen}
+          onClose={() => setCoverOpen(false)}
+        />
+      )}
       <LoveButton
         record={record}
         resource={resource}
@@ -260,6 +367,11 @@ export const SongContextMenu = ({
               <MenuItem
                 value={key}
                 key={key}
+                className={
+                  key === 'moveToTrash' || key === 'permanentlyDelete'
+                    ? classes.destructive
+                    : undefined
+                }
                 onClick={
                   showInPlaylistDisabled
                     ? (e) => e.stopPropagation()
@@ -276,6 +388,57 @@ export const SongContextMenu = ({
           )
         })}
       </Menu>
+      {permissions === 'admin' && !permissionsLoading && (
+        <Dialog
+          open={trashOpen}
+          onClose={() => !trashing && setTrashOpen(false)}
+          onClick={(event) => event.stopPropagation()}
+          aria-labelledby={`trash-song-${record.id}`}
+          disableEscapeKeyDown={trashing}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle id={`trash-song-${record.id}`}>
+            {translate(
+              trashMode === 'permanent'
+                ? 'resources.musicManagement.permanentOneTitle'
+                : 'resources.trash.confirmTitle',
+            )}
+          </DialogTitle>
+          <DialogContent>
+            <Typography gutterBottom>{record.title || record.path}</Typography>
+            <DialogContentText>
+              {translate(
+                trashMode === 'permanent'
+                  ? 'resources.musicManagement.permanentOneDescription'
+                  : 'resources.trash.confirmDescription',
+              )}
+            </DialogContentText>
+            {trashError && (
+              <Typography role="alert" color="error">
+                {trashError}
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button disabled={trashing} onClick={() => setTrashOpen(false)}>
+              {translate('resources.trash.cancel')}
+            </Button>
+            <Button
+              color="primary"
+              disabled={trashing}
+              onClick={confirmTrash}
+              startIcon={trashing ? <CircularProgress size={16} /> : undefined}
+            >
+              {translate(
+                trashMode === 'permanent'
+                  ? 'resources.musicManagement.deleteOne'
+                  : 'resources.trash.moveToTrash',
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       <Menu
         anchorEl={playlistAnchorEl}
         open={Boolean(playlistAnchorEl)}
