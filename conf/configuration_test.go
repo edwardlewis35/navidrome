@@ -3,6 +3,7 @@ package conf_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -87,16 +88,32 @@ var _ = Describe("Configuration", func() {
 		})
 
 		It("never includes its raw value in the debug configuration dump", func() {
-			logFile := filepath.Join(GinkgoT().TempDir(), "configuration.log")
+			reader, writer, err := os.Pipe()
+			Expect(err).ToNot(HaveOccurred())
+			previousStderr := os.Stderr
+			os.Stderr = writer
+			log.SetOutput(writer)
+			DeferCleanup(func() {
+				os.Stderr = previousStderr
+				log.SetOutput(previousStderr)
+				_ = writer.Close()
+				_ = reader.Close()
+			})
+			var content []byte
+			var readErr error
+			captured := make(chan struct{})
+			go func() {
+				defer close(captured)
+				content, readErr = io.ReadAll(reader)
+			}()
 			proxy := "http://private-user:private-password@proxy.example:7891" // #nosec G101 -- Synthetic rejected proxy credential verifies that debug output redacts secrets.
-			viper.Set("logfile", logFile)
 			viper.Set("loglevel", "debug")
 			viper.Set("enablelogredacting", false)
 			viper.Set("onlinecoverproxy", proxy)
-			DeferCleanup(log.SetOutput, os.Stderr)
 			conf.Load(false)
-			content, err := os.ReadFile(logFile)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(writer.Close()).To(Succeed())
+			<-captured
+			Expect(readErr).ToNot(HaveOccurred())
 			Expect(string(content)).To(ContainSubstring("[configured]"))
 			Expect(string(content)).ToNot(ContainSubstring(proxy))
 			Expect(string(content)).ToNot(ContainSubstring("private-user"))
