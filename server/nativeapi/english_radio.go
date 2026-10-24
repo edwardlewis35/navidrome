@@ -61,7 +61,7 @@ func (api *Router) addEnglishRadioProtectedRoutes(r chi.Router, service *english
 		}
 		scheme, _ := server.ServerAddress(r)
 		path := radioStreamPath(id)
-		http.SetCookie(w, &http.Cookie{Name: radioTicketCookie, Value: value, Path: path, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: scheme == "https", MaxAge: int(englishradio.TicketLifetime.Seconds()), Expires: time.Now().Add(englishradio.TicketLifetime)})
+		http.SetCookie(w, &http.Cookie{Name: radioTicketCookie, Value: value, Path: path, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: scheme == "https", MaxAge: int(englishradio.TicketLifetime.Seconds()), Expires: time.Now().Add(englishradio.TicketLifetime)}) // #nosec G124 -- Secure follows actual HTTPS; local HTTP playback is supported. HttpOnly and SameSite are always set.
 		radioRespond(w, map[string]string{"streamUrl": path}, nil)
 	})
 }

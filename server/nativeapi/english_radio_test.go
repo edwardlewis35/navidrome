@@ -11,6 +11,7 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/core/englishradio"
 	"github.com/navidrome/navidrome/model"
+	"github.com/navidrome/navidrome/model/request"
 	"github.com/navidrome/navidrome/tests"
 )
 
@@ -44,7 +45,7 @@ func TestEnglishRadioCatalogTicketsAndPermissions(t *testing.T) {
 		t.Fatalf("playback: %d %s", w.Code, w.Body.String())
 	}
 	cookies := w.Result().Cookies()
-	if len(cookies) != 1 || cookies[0].Path != playback.StreamURL || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteStrictMode || strings.Contains(w.Body.String(), cookies[0].Value) || strings.Contains(playback.StreamURL, "?") {
+	if len(cookies) != 1 || cookies[0].Path != playback.StreamURL || cookies[0].Secure || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteStrictMode || strings.Contains(w.Body.String(), cookies[0].Value) || strings.Contains(playback.StreamURL, "?") {
 		t.Fatal("capability escaped its station cookie")
 	}
 	for _, method := range []string{http.MethodGet, http.MethodPut} {
@@ -62,11 +63,25 @@ func TestEnglishRadioCatalogTicketsAndPermissions(t *testing.T) {
 		t.Fatal("public relay without ticket")
 	}
 	req := httptest.NewRequest(http.MethodGet, "/english-radio/stream/heart-london", nil)
-	req.AddCookie(&http.Cookie{Name: radioTicketCookie, Value: "not-a-valid-capability"})
+	req.Header.Set("Cookie", radioTicketCookie+"=not-a-valid-capability")
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized || req.Header.Get("Cookie") != "" {
 		t.Fatal("invalid capability accepted or left in request log headers")
+	}
+}
+
+func TestEnglishRadioHTTPSCookieIsSecure(t *testing.T) {
+	t.Cleanup(conf.SnapshotConfig())
+	conf.Server.BasePath = ""
+	r := englishRadioTestRouter(&tests.MockDataStore{})
+	req := httptest.NewRequest(http.MethodPost, "https://radio.example/english-radio/play/heart-london", nil)
+	req = req.WithContext(request.WithUser(req.Context(), model.User{ID: "listener"}))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	cookies := w.Result().Cookies()
+	if w.Code != http.StatusOK || len(cookies) != 1 || !cookies[0].Secure || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteStrictMode {
+		t.Fatal("HTTPS radio capability requires Secure, HttpOnly and SameSite Strict")
 	}
 }
 
