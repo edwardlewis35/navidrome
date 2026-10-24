@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useDataProvider, useNotify, useRefresh } from 'react-admin'
+import {
+  useDataProvider,
+  useNotify,
+  usePermissions,
+  useRefresh,
+} from 'react-admin'
+import { Link } from 'react-router-dom'
 import { useCoverText } from './useCoverText'
 import {
   Button,
@@ -57,6 +63,7 @@ export default function OnlineCoverDialog({
   const text = useCoverText()
   const classes = useStyles()
   const dataProvider = useDataProvider()
+  const { permissions, loading: permissionsLoading } = usePermissions()
   const notify = useNotify()
   const refresh = useRefresh()
   const [query, setQuery] = useState(initialQuery)
@@ -86,14 +93,13 @@ export default function OnlineCoverDialog({
     setBusy('search')
     setError('')
     try {
-      const { data } = await dataProvider.searchOnlineCovers(
-        kind,
+      const { data } = await dataProvider.searchOnlineCovers(kind, {
         id,
-        query.trim() === initialQuery.trim() ? '' : query.trim(),
-      )
+        query: query.trim() === initialQuery.trim() ? '' : query.trim(),
+      })
       if (request.current === token) setResults(data.candidates || [])
-    } catch {
-      if (request.current === token) setError(text.error)
+    } catch (failure) {
+      if (request.current === token) setError(errorMessage(failure, text.error))
     } finally {
       if (request.current === token) {
         busyRef.current = false
@@ -109,18 +115,34 @@ export default function OnlineCoverDialog({
     setBusy(cover.id)
     setError('')
     try {
-      await dataProvider.applyOnlineCover(kind, id, cover.id)
+      await dataProvider.applyOnlineCover(kind, { id, releaseId: cover.id })
       if (request.current !== token) return
       notify(text.saved, { type: 'info' })
       refresh()
       onClose()
-    } catch {
-      if (request.current === token) setError(text.failed)
+    } catch (failure) {
+      if (request.current === token)
+        setError(errorMessage(failure, text.failed))
     } finally {
       if (request.current === token) {
         busyRef.current = false
         setBusy(null)
       }
+    }
+  }
+
+  const errorMessage = (failure, fallback) => {
+    switch (failure?.status) {
+      case 400:
+        return text.invalidSelection
+      case 429:
+        return text.busy
+      case 502:
+        return permissions === 'admin' && !permissionsLoading
+          ? text.connectionProxy
+          : text.connection
+      default:
+        return fallback
     }
   }
 
@@ -208,6 +230,16 @@ export default function OnlineCoverDialog({
         </Grid>
       </DialogContent>
       <DialogActions>
+        {!permissionsLoading && permissions === 'admin' && (
+          <Button
+            component={Link}
+            to="/covers/settings"
+            role="link"
+            disabled={Boolean(busy)}
+          >
+            {text.proxySettings}
+          </Button>
+        )}
         <Button onClick={onClose} disabled={Boolean(busy)}>
           {text.close}
         </Button>

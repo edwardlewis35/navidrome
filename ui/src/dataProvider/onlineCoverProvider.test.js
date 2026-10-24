@@ -6,7 +6,10 @@ describe('online cover provider', () => {
     const http = vi.fn().mockResolvedValue({ json: { candidates } })
     const provider = createOnlineCoverProvider(http)
     await expect(
-      provider.searchOnlineCovers('song', 'song/id', 'Album words'),
+      provider.searchOnlineCovers('song', {
+        id: 'song/id',
+        query: 'Album words',
+      }),
     ).resolves.toEqual({ data: { candidates } })
     const [url, options] = http.mock.calls[0]
     expect(url).toBe('/api/online-cover/search')
@@ -24,7 +27,10 @@ describe('online cover provider', () => {
       .mockResolvedValue({ json: { id: 'playlist-one', saved: true } })
     const provider = createOnlineCoverProvider(http)
     await expect(
-      provider.applyOnlineCover('playlist', 'playlist-one', 'release-uuid'),
+      provider.applyOnlineCover('playlist', {
+        id: 'playlist-one',
+        releaseId: 'release-uuid',
+      }),
     ).resolves.toEqual({ data: { id: 'playlist-one', saved: true } })
     const [url, options] = http.mock.calls[0]
     expect(url).toBe('/api/online-cover/apply')
@@ -40,11 +46,11 @@ describe('online cover provider', () => {
     const error = { status: 403, body: { error: 'Cannot update' } }
     const http = vi.fn().mockRejectedValue(error)
     const provider = createOnlineCoverProvider(http)
-    await expect(provider.searchOnlineCovers('album', 'a', '')).rejects.toBe(
-      error,
-    )
-    await expect(provider.applyOnlineCover('album', 'a', 'r')).rejects.toBe(
-      error,
-    )
+    await expect(
+      provider.searchOnlineCovers('album', { id: 'a', query: '' }),
+    ).rejects.toBe(error)
+    await expect(
+      provider.applyOnlineCover('album', { id: 'a', releaseId: 'r' }),
+    ).rejects.toBe(error)
   })
 })

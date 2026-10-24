@@ -118,7 +118,9 @@ type onlineCoverCatalogue interface {
 }
 
 func (api *Router) addOnlineCoverRoutes(r chi.Router) {
-	api.addOnlineCoverRoutesWithCatalogue(r, onlinecover.NewCatalog())
+	catalog := onlinecover.NewStoredCatalog(api.ds.Property(), conf.Server.OnlineCoverProxy)
+	api.addOnlineCoverSettingsRoutes(r, catalog)
+	api.addOnlineCoverRoutesWithCatalogue(r, catalog)
 }
 
 func (api *Router) addOnlineCoverRoutesWithCatalogue(r chi.Router, catalog onlineCoverCatalogue) {

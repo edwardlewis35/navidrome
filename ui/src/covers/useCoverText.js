@@ -16,6 +16,11 @@ export const useCoverText = () => {
         error: '封面目录暂时不可用，请稍后重试。',
         saved: '封面已保存，正在刷新显示',
         failed: '保存封面失败，请重试。',
+        invalidSelection: '封面选择无效，请重新搜索并选择封面。',
+        busy: '封面服务请求较多，请稍后重试。',
+        connection: '封面服务连接失败，请稍后重试。',
+        connectionProxy: '封面服务连接失败，请检查封面代理设置后重试。',
+        proxySettings: '封面代理设置',
         source: '查看来源',
         searching: '正在搜索封面',
       }
@@ -31,6 +36,14 @@ export const useCoverText = () => {
         error: 'Cover catalogue is unavailable. Please retry later.',
         saved: 'Cover saved; refreshing artwork',
         failed: 'Could not save the cover. Please retry.',
+        invalidSelection:
+          'Invalid cover selection. Search again and choose a cover.',
+        busy: 'Cover service is busy. Please retry shortly.',
+        connection:
+          'Could not connect to the cover service. Please retry later.',
+        connectionProxy:
+          'Could not connect to the cover service. Check cover proxy settings and retry.',
+        proxySettings: 'Cover proxy settings',
         source: 'View source',
         searching: 'Searching for covers',
       }

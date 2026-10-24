@@ -7,7 +7,7 @@ export const createSongManagementProvider = (httpClient) => ({
       headers: new Headers({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ ids, mode, confirm: true }),
     }).then(({ json }) => ({ data: json })),
-  uploadMusic: (libraryId, folder, file) => {
+  uploadMusic: (libraryId, { folder, file }) => {
     const body = new FormData()
     body.append('file', file)
     return httpClient(

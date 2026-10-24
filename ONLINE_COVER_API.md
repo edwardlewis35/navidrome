@@ -38,7 +38,15 @@
 
 ## 可选封面代理
 
-服务器配置项 `OnlineCoverProxy`（环境变量 `ND_ONLINECOVERPROXY`）默认为空，保持原有 HTTP 客户端行为。需要独立代理时，可以设置 `ND_ONLINECOVERPROXY=http://proxy.example:7891`，重启服务后生效。仅支持带显式端口的 `http://主机:端口` 或 `https://主机:端口`；不接受用户名、密码、路径、查询参数或片段。
+管理员可在侧栏“封面设置”修改专用代理，保存后立即用于新的封面请求，重启后保留。设置接口：
+
+- `GET /api/online-cover/settings` 返回 `{"proxy":"http://proxy.example:7891","source":"saved"}`。
+- `PUT /api/online-cover/settings` 接受 `{"proxy":"http://proxy.example:7891"}` 并返回生效值。
+- 保存 `{"proxy":""}` 表示明确直连，包括忽略进程代理环境变量。
+- 未保存过页面设置时采用服务器配置项 `OnlineCoverProxy`（环境变量 `ND_ONLINECOVERPROXY`），`source` 为 `server`。环境变量默认为空，保持原有 HTTP 客户端行为。
+- 未登录返回 401，普通用户返回 403。无效参数返回 400，已有设置保持不变。
+
+仅支持最多 2048 字节、带显式端口的 `http://主机:端口` 或 `https://主机:端口`；不接受用户名、密码、路径、查询参数或片段。设置保存在数据库 Property 中；切换专用 HTTP 客户端保留原有搜索限速和并发限制。
 
 该配置只用于服务器向 MusicBrainz、Cover Art Archive 及其允许的 Archive 图片地址发送的封面请求，不影响 AI、GitHub、音乐播放或其他 HTTP 客户端，也不会修改系统代理。浏览器直接加载候选预览图时使用浏览器自身网络。代理配置无效或不可达时，封面请求返回 502，不会静默绕过该代理。已有下载超时、跳转域名、并发和图片大小限制继续生效；调试配置日志不会输出该项原始值。
 

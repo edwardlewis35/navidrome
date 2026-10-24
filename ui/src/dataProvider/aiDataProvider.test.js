@@ -29,7 +29,7 @@ describe('AI data provider', () => {
     httpClient.mockResolvedValue({
       json: { enabled: true, keyConfigured: true },
     })
-    const result = await provider.updateAISettings(settings)
+    const result = await provider.updateAISettings('ai', { data: settings })
     expect(httpClient).toHaveBeenCalledWith('/api/ai/settings', {
       method: 'PUT',
       headers: new Headers({ 'Content-Type': 'application/json' }),

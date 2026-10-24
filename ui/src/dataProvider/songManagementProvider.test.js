@@ -33,7 +33,7 @@ describe('administrator song management provider', () => {
       .mockResolvedValue({ json: { saved: true, scanComplete: false } })
     const file = new File(['fLaC audio'], '歌曲.flac', { type: 'audio/flac' })
     const provider = createSongManagementProvider(http)
-    await provider.uploadMusic(1, 'Artist/Album', file)
+    await provider.uploadMusic('1', { folder: 'Artist/Album', file })
     const [url, options] = http.mock.calls[0]
     expect(url).toBe('/api/library/1/upload?folder=Artist%2FAlbum')
     expect(options.headers.has('Content-Type')).toBe(false)

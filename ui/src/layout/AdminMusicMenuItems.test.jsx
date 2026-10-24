@@ -35,6 +35,9 @@ describe('administrator music navigation', () => {
       'href',
       '/ai/settings',
     )
+    expect(
+      screen.getByRole('link', { name: 'Cover settings' }),
+    ).toHaveAttribute('href', '/covers/settings')
   })
 
   it.each(['user', undefined])(
@@ -58,6 +61,10 @@ describe('administrator music navigation', () => {
     expect(screen.getByRole('link', { name: 'AI 音乐' })).toHaveAttribute(
       'href',
       '/ai/settings',
+    )
+    expect(screen.getByRole('link', { name: '封面设置' })).toHaveAttribute(
+      'href',
+      '/covers/settings',
     )
   })
 })

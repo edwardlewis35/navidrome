@@ -1,16 +1,23 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OnlineCoverDialog from './OnlineCoverDialog'
+import { MemoryRouter } from 'react-router-dom'
 const mocks = vi.hoisted(() => ({
   provider: { searchOnlineCovers: vi.fn(), applyOnlineCover: vi.fn() },
   notify: vi.fn(),
   refresh: vi.fn(),
+  permissions: 'regular',
+  permissionsLoading: false,
 }))
 vi.mock('react-admin', () => ({
   useDataProvider: () => mocks.provider,
   useNotify: () => mocks.notify,
   useRefresh: () => mocks.refresh,
   useLocale: () => 'en',
+  usePermissions: () => ({
+    permissions: mocks.permissions,
+    loading: mocks.permissionsLoading,
+  }),
 }))
 const cover = {
   id: 'release-one',
@@ -32,6 +39,8 @@ const search = () =>
 describe('online cover selection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.permissions = 'regular'
+    mocks.permissionsLoading = false
     mocks.provider.searchOnlineCovers.mockResolvedValue({
       data: { candidates: [cover] },
     })
@@ -57,11 +66,10 @@ describe('online cover selection', () => {
     render(<OnlineCoverDialog {...settings} />)
     search()
     await screen.findByText('Matching release')
-    expect(mocks.provider.searchOnlineCovers).toHaveBeenCalledWith(
-      'playlist',
-      'playlist-one',
-      '',
-    )
+    expect(mocks.provider.searchOnlineCovers).toHaveBeenCalledWith('playlist', {
+      id: 'playlist-one',
+      query: '',
+    })
     fireEvent.change(
       screen.getByRole('textbox', { name: 'Album or playlist name' }),
       { target: { value: '  Different album  ' } },
@@ -70,18 +78,16 @@ describe('online cover selection', () => {
     await waitFor(() =>
       expect(mocks.provider.searchOnlineCovers).toHaveBeenLastCalledWith(
         'playlist',
-        'playlist-one',
-        'Different album',
+        { id: 'playlist-one', query: 'Different album' },
       ),
     )
     fireEvent.click(screen.getByRole('button', { name: 'Use this cover' }))
     await waitFor(() => expect(settings.onClose).toHaveBeenCalledOnce())
     expect(mocks.provider.applyOnlineCover).toHaveBeenCalledOnce()
-    expect(mocks.provider.applyOnlineCover).toHaveBeenCalledWith(
-      'playlist',
-      'playlist-one',
-      cover.id,
-    )
+    expect(mocks.provider.applyOnlineCover).toHaveBeenCalledWith('playlist', {
+      id: 'playlist-one',
+      releaseId: cover.id,
+    })
     expect(mocks.refresh).toHaveBeenCalledOnce()
     expect(mocks.notify).toHaveBeenCalledWith(
       'Cover saved; refreshing artwork',
@@ -176,4 +182,45 @@ describe('online cover selection', () => {
     ).toHaveValue('Other playlist')
     expect(mocks.provider.searchOnlineCovers).toHaveBeenCalledOnce()
   })
+
+  it.each([
+    [400, 'Search again and choose a cover.'],
+    [429, 'Cover service is busy.'],
+    [502, 'Could not connect to the cover service.'],
+  ])(
+    'uses safe messages for status %s without exposing provider details',
+    async (status, message) => {
+      mocks.provider.searchOnlineCovers.mockRejectedValueOnce({
+        status,
+        message: 'private-provider-response',
+        body: { error: 'private-provider-response' },
+      })
+      render(<OnlineCoverDialog {...props()} />)
+      search()
+      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+      expect(
+        screen.queryByText(/private-provider-response/),
+      ).not.toBeInTheDocument()
+    },
+  )
+
+  it.each([
+    ['admin', false, true],
+    ['admin', true, false],
+    ['regular', false, false],
+  ])(
+    'shows the proxy settings link only for loaded admin permissions',
+    async (permissions, loading, visible) => {
+      mocks.permissions = permissions
+      mocks.permissionsLoading = loading
+      render(
+        <MemoryRouter>
+          <OnlineCoverDialog {...props()} />
+        </MemoryRouter>,
+      )
+      const link = screen.queryByRole('link', { name: 'Cover proxy settings' })
+      if (visible) expect(link).toHaveAttribute('href', '/covers/settings')
+      else expect(link).not.toBeInTheDocument()
+    },
+  )
 })

@@ -52,12 +52,14 @@ describe('AI settings', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
     await screen.findByRole('status')
-    expect(mocks.provider.updateAISettings).toHaveBeenCalledWith({
-      enabled: true,
-      endpoint: 'https://provider.example/v1',
-      model: 'new-model',
-      apiKey: 'fixture-new-private-key',
-      clearKey: false,
+    expect(mocks.provider.updateAISettings).toHaveBeenCalledWith('ai', {
+      data: {
+        enabled: true,
+        endpoint: 'https://provider.example/v1',
+        model: 'new-model',
+        apiKey: 'fixture-new-private-key',
+        clearKey: false,
+      },
     })
     expect(screen.getByLabelText('API key')).toHaveValue('')
   })
@@ -72,9 +74,8 @@ describe('AI settings', () => {
     await waitFor(() =>
       expect(mocks.provider.updateAISettings).toHaveBeenCalled(),
     )
-    expect(mocks.provider.updateAISettings.mock.calls[0][0]).toMatchObject({
-      apiKey: '',
-      clearKey: true,
+    expect(mocks.provider.updateAISettings.mock.calls[0][1]).toMatchObject({
+      data: { apiKey: '', clearKey: true },
     })
   })
   it('shows a retry when loading fails and handles provider errors without exposing response bodies', async () => {

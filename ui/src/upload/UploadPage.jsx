@@ -106,11 +106,10 @@ export const UploadContent = () => {
     const nextResults = []
     for (const file of snapshot.files) {
       try {
-        const { data } = await provider.uploadMusic(
-          snapshot.libraryId,
-          snapshot.folder,
+        const { data } = await provider.uploadMusic(snapshot.libraryId, {
+          folder: snapshot.folder,
           file,
-        )
+        })
         nextResults.push({
           name: file.name,
           saved: data.saved,
@@ -161,6 +160,7 @@ export const UploadContent = () => {
         <Typography variant="h5">{text('name')}</Typography>
         <Typography color="textSecondary">{text('description')}</Typography>
         <TextField
+          id="upload-library"
           select
           label={text('library')}
           value={libraryId}
@@ -179,6 +179,7 @@ export const UploadContent = () => {
           ))}
         </TextField>
         <TextField
+          id="upload-folder"
           label={text('folder')}
           helperText={text('folderHelp')}
           value={folder}

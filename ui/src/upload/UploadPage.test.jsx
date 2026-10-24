@@ -77,11 +77,10 @@ describe('admin music upload', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Upload and refresh' }))
     await screen.findByText(/File saved; library refresh unfinished/)
-    expect(mocks.provider.uploadMusic).toHaveBeenCalledWith(
-      '1',
-      '',
-      expect.objectContaining({ name: 'song.flac' }),
-    )
+    expect(mocks.provider.uploadMusic).toHaveBeenCalledWith('1', {
+      folder: '',
+      file: expect.objectContaining({ name: 'song.flac' }),
+    })
     expect(
       screen.getByRole('button', { name: 'Upload and refresh' }),
     ).toBeDisabled()

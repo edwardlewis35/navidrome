@@ -41,6 +41,7 @@ type Candidate struct {
 }
 
 type Catalog struct {
+	clientMu    sync.RWMutex
 	client      *http.Client
 	setupErr    error
 	musicBrainz string
@@ -50,6 +51,7 @@ type Catalog struct {
 	searches    chan struct{}
 	frontChecks chan struct{}
 	downloads   chan struct{}
+	settings    *catalogSettings
 }
 
 func NewCatalog() *Catalog {
@@ -121,8 +123,9 @@ func (c *Catalog) reserveSearch(ctx context.Context) error {
 }
 
 func (c *Catalog) get(ctx context.Context, target string, limit int64) ([]byte, error) {
-	if c.setupErr != nil {
-		return nil, c.setupErr
+	client, err := c.httpClient()
+	if err != nil {
+		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
@@ -130,7 +133,7 @@ func (c *Catalog) get(ctx context.Context, target string, limit int64) ([]byte, 
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
-	res, err := c.client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: network request failed", ErrUnavailable)
 	}
@@ -196,8 +199,11 @@ type catalogRelease struct {
 
 // Search sends names only. Clients cannot supply provider URLs or filesystem paths.
 func (c *Catalog) Search(ctx context.Context, query, releaseID string) ([]Candidate, error) {
-	if c.setupErr != nil {
-		return nil, c.setupErr
+	if err := c.loadSettings(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := c.httpClient(); err != nil {
+		return nil, err
 	}
 	select {
 	case c.searches <- struct{}{}:
@@ -314,8 +320,11 @@ func (c *Catalog) candidateForRelease(release catalogRelease) Candidate {
 
 // Download accepts a catalogue release ID only and re-encodes a bounded image.
 func (c *Catalog) Download(ctx context.Context, releaseID string) ([]byte, error) {
-	if c.setupErr != nil {
-		return nil, c.setupErr
+	if err := c.loadSettings(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := c.httpClient(); err != nil {
+		return nil, err
 	}
 	if !ValidReleaseID(releaseID) {
 		return nil, ErrInvalidSelection

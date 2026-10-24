@@ -5,7 +5,7 @@ export const createAIDataProvider = (httpClient) => ({
     httpClient(`${REST_URL}/ai/status`).then(({ json }) => ({ data: json })),
   getAISettings: () =>
     httpClient(`${REST_URL}/ai/settings`).then(({ json }) => ({ data: json })),
-  updateAISettings: (data) =>
+  updateAISettings: (_resource, { data }) =>
     httpClient(`${REST_URL}/ai/settings`, {
       method: 'PUT',
       headers: new Headers({ 'Content-Type': 'application/json' }),

@@ -56,7 +56,9 @@ docker compose -f docker-compose.netease.yml up -d
 
 管理员可以保存歌曲和专辑封面；歌单所有者在允许上传封面时也可以设置自己的歌单封面。封面保存在数据目录，不修改音频标签。备份时应保留 `artwork` 目录。
 
-网络受限时，可设置可选环境变量 `ND_ONLINECOVERPROXY=http://proxy.example:7891` 并重启服务。默认留空；只代理服务器的在线封面搜索和下载，不改变 AI 或播放请求的网络。代理只支持不带认证、路径、参数或片段且有显式端口的 HTTP/HTTPS 地址，配置错误时会提示封面服务不可用。完整限制见 [ONLINE_COVER_API.md](ONLINE_COVER_API.md)。
+网络受限时，管理员可打开侧栏“封面设置”，填写 `http://proxy.example:7891` 并保存，立即生效且重启后保留。留空并保存表示直连。封面搜索弹窗也提供设置入口；普通用户不能修改代理。
+
+没有保存过页面设置时，采用服务器环境变量 `ND_ONLINECOVERPROXY` 作为默认值。只代理服务器的在线封面搜索和下载，不改变 AI 或播放请求的网络。代理只支持不带认证、路径、参数或片段且有显式端口的 HTTP/HTTPS 地址。完整限制见 [ONLINE_COVER_API.md](ONLINE_COVER_API.md)。
 
 ## 精简入口和客户端兼容
 

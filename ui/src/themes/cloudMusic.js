@@ -158,10 +158,25 @@ export default {
     },
     RaSidebar: {
       root: { height: 'calc(100vh - 64px)', flexShrink: 0 },
-      fixed: { height: 'calc(100vh - 64px)' },
+      fixed: {
+        top: 64,
+        bottom: 0,
+        height: 'auto',
+        width: 'inherit',
+        boxSizing: 'border-box',
+        backgroundColor: '#f6f6f7',
+        borderRight: `1px solid ${line}`,
+        overflowY: 'auto',
+        overscrollBehaviorY: 'contain',
+      },
       drawerPaper: {
         backgroundColor: '#f6f6f7',
         borderRight: `1px solid ${line}`,
+        // Desktop menus are fixed; the relative drawer only reserves their width.
+        '@media (min-width: 600px)': {
+          backgroundColor: 'transparent',
+          borderRight: 'none',
+        },
       },
     },
     RaList: {

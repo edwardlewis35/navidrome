@@ -80,12 +80,14 @@ function AdminAISettings() {
     setError('')
     setSaved(false)
     try {
-      const { data } = await provider.updateAISettings({
-        enabled: settings.enabled,
-        endpoint: settings.endpoint.trim(),
-        model: settings.model.trim(),
-        apiKey: clearKey ? '' : apiKey,
-        clearKey,
+      const { data } = await provider.updateAISettings('ai', {
+        data: {
+          enabled: settings.enabled,
+          endpoint: settings.endpoint.trim(),
+          model: settings.model.trim(),
+          apiKey: clearKey ? '' : apiKey,
+          clearKey,
+        },
       })
       if (active.current) {
         setSettings({ ...emptySettings, ...data })
