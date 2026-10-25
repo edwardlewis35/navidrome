@@ -69,6 +69,7 @@ type ItemArtwork struct {
 
 // ItemArtworkInfo is the list-hydration projection (item_artwork joined with artwork).
 type ItemArtworkInfo struct {
+	CustomCover   bool
 	ItemID        string
 	Hash          string
 	BlurHash      string

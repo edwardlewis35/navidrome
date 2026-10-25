@@ -3,6 +3,7 @@ package conf_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -74,6 +75,50 @@ var _ = Describe("Configuration", func() {
 			viper.Set("enablescheduleddbanalyze", false)
 			conf.Load(true)
 			Expect(conf.Server.EnableScheduledDBAnalyze).To(BeFalse())
+		})
+	})
+
+	Describe("online cover proxy", func() {
+		It("is empty by default and can be configured independently", func() {
+			conf.Load(true)
+			Expect(conf.Server.OnlineCoverProxy).To(BeEmpty())
+			viper.Set("onlinecoverproxy", "http://proxy.example:7891")
+			conf.Load(true)
+			Expect(conf.Server.OnlineCoverProxy).To(Equal("http://proxy.example:7891"))
+		})
+
+		It("never includes its raw value in the debug configuration dump", func() {
+			reader, writer, err := os.Pipe()
+			Expect(err).ToNot(HaveOccurred())
+			previousStderr := os.Stderr
+			os.Stderr = writer
+			log.SetOutput(writer)
+			DeferCleanup(func() {
+				os.Stderr = previousStderr
+				log.SetOutput(previousStderr)
+				_ = writer.Close()
+				_ = reader.Close()
+			})
+			var content []byte
+			var readErr error
+			captured := make(chan struct{})
+			go func() {
+				defer close(captured)
+				content, readErr = io.ReadAll(reader)
+			}()
+			proxy := "http://private-user:private-password@proxy.example:7891" // #nosec G101 -- Synthetic rejected proxy credential verifies that debug output redacts secrets.
+			viper.Set("loglevel", "debug")
+			viper.Set("enablelogredacting", false)
+			viper.Set("onlinecoverproxy", proxy)
+			conf.Load(false)
+			Expect(writer.Close()).To(Succeed())
+			<-captured
+			Expect(readErr).ToNot(HaveOccurred())
+			Expect(string(content)).To(ContainSubstring("[configured]"))
+			Expect(string(content)).ToNot(ContainSubstring(proxy))
+			Expect(string(content)).ToNot(ContainSubstring("private-user"))
+			Expect(string(content)).ToNot(ContainSubstring("private-password"))
+			Expect(conf.Server.OnlineCoverProxy).To(Equal(proxy))
 		})
 	})
 

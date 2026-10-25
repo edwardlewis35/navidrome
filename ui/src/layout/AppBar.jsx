@@ -22,6 +22,8 @@ import ActivityPanel from './ActivityPanel'
 import NowPlayingPanel from './NowPlayingPanel'
 import UserMenu from './UserMenu'
 import config from '../config'
+import { useTheme } from '@material-ui/core/styles'
+import MusicHeader from './MusicHeader'
 
 const useStyles = makeStyles(
   (theme) => ({
@@ -158,8 +160,13 @@ const CustomUserMenu = ({ onClick, ...rest }) => {
   )
 }
 
-const AppBar = (props) => (
-  <RAAppBar {...props} container={Fragment} userMenu={<CustomUserMenu />} />
-)
+const AppBar = (props) => {
+  const theme = useTheme()
+  return (
+    <RAAppBar {...props} container={Fragment} userMenu={<CustomUserMenu />}>
+      {theme.cloudMusic ? <MusicHeader /> : null}
+    </RAAppBar>
+  )
+}
 
 export default AppBar

@@ -12,7 +12,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/consts"
+	"github.com/navidrome/navidrome/core"
 	"github.com/navidrome/navidrome/core/artwork"
+	"github.com/navidrome/navidrome/core/auth"
 	"github.com/navidrome/navidrome/db"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -82,6 +84,12 @@ func postRun() {
 // exit with a non-zero code. If the context is cancelled (a signal or a service stop), it returns nil.
 func runNavidrome(parentCtx context.Context) error {
 	defer db.Init(parentCtx)()
+	// Finish interrupted file transitions before HTTP requests, watchers or the
+	// initial scan can trigger missing-file cleanup.
+	ds := CreateDataStore()
+	if err := core.NewSongTrash(ds, conf.Server.DataFolder.String()).Recover(auth.WithAdminUser(parentCtx, ds)); err != nil {
+		return err
+	}
 
 	g, ctx := errgroup.WithContext(parentCtx)
 	g.Go(startServer(ctx))
@@ -125,7 +133,8 @@ func mainContext(ctx context.Context) (context.Context, context.CancelFunc) {
 func startServer(ctx context.Context) func() error {
 	return func() error {
 		a := CreateServer()
-		a.MountRouter("Native API", consts.URLPathNativeAPI, CreateNativeAPIRouter(ctx))
+		nativeAPI := CreateNativeAPIRouter(ctx)
+		a.MountRouter("Native API", consts.URLPathNativeAPI, nativeAPI)
 		a.MountRouter("Subsonic API", consts.URLPathSubsonicAPI, CreateSubsonicAPIRouter(ctx))
 		a.MountRouter("Public Endpoints", consts.URLPathPublic, CreatePublicRouter())
 		if conf.Server.LastFM.Enabled {
@@ -152,6 +161,12 @@ func startServer(ctx context.Context) func() error {
 		if strings.HasPrefix(conf.Server.UILoginBackgroundURL, "/") {
 			a.MountRouter("Background images", conf.Server.UILoginBackgroundURL, backgrounds.NewHandler())
 		}
+		workerCtx, stopWorker := context.WithCancel(ctx)
+		workerDone := startDailyAIWorker(workerCtx, nativeAPI.AIMusicService(), time.Minute)
+		defer func() {
+			stopWorker()
+			<-workerDone
+		}()
 		return a.Run(ctx, conf.Server.Address, conf.Server.Port, conf.Server.TLSCert, conf.Server.TLSKey)
 	}
 }

@@ -14,4 +14,5 @@ var (
 	ErrNotAvailable        = errors.New("functionality not available")
 	ErrValidation          = errors.New("validation error")
 	ErrPlaylistNotEditable = errors.New("playlist tracks are not editable")
+	ErrNotTrashed          = errors.New("only trashed songs can be permanently deleted")
 )

@@ -15,6 +15,7 @@ import (
 	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/conf/configtest"
 	"github.com/navidrome/navidrome/core/agents"
+	"github.com/navidrome/navidrome/core/onlinecover"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/tests"
 	. "github.com/onsi/ginkgo/v2"
@@ -86,6 +87,24 @@ var _ = Describe("resolveItem", func() {
 		BeforeEach(func() {
 			conf.Server.EnableMediaFileCoverArt = true
 			ds.MockedMediaFile = tests.CreateMockMediaFileRepo()
+		})
+
+		It("resolves a selected local cover without embedded art even when extraction is off", func() {
+			conf.Server.EnableMediaFileCoverArt = false
+			conf.Server.DataFolder = conf.NewDir(GinkgoT().TempDir())
+			ds.MockedMediaFile.(*tests.MockMediaFileRepo).SetData(model.MediaFiles{{ID: "custom-song", HasCoverArt: false}})
+			cover, err := os.ReadFile(filepath.Join(repoRoot, "tests/fixtures/artist/an-album/cover.jpg"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(onlinecover.Save("song", "custom-song", cover)).To(Succeed())
+			res, err := newResolver(ds, ag, ffm, nil).resolve(ctx, model.ArtworkQueueItem{ItemKind: "mf", ItemID: "custom-song"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.reader).ToNot(BeNil())
+			defer res.reader.Close()
+			got, err := io.ReadAll(res.reader)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(got).To(Equal(cover))
+			Expect(res.source).To(Equal("upload"))
+			Expect(res.sourcePath).To(Equal(onlinecover.Path("song", "custom-song")))
 		})
 
 		It("resolves embedded art from the track file", func() {

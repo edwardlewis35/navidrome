@@ -2,10 +2,8 @@ import React from 'react'
 import { useTranslate } from 'react-admin'
 import { IconButton, Tooltip, Link } from '@material-ui/core'
 
-import { ImLastfm2 } from 'react-icons/im'
 import MusicBrainz from '../icons/MusicBrainz'
-import { intersperse, isLastFmURL } from '../utils'
-import config from '../config'
+import { intersperse } from '../utils'
 import { makeStyles } from '@material-ui/core/styles'
 
 const useStyles = makeStyles({
@@ -18,9 +16,6 @@ const ArtistExternalLinks = ({ artistInfo, record }) => {
   const classes = useStyles()
   const translate = useTranslate()
   let linkButtons = []
-  const lastFMlink = artistInfo?.biography?.match(
-    /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1/,
-  )
 
   const addLink = (url, title, icon) => {
     const translatedTitle = translate(title)
@@ -35,22 +30,6 @@ const ArtistExternalLinks = ({ artistInfo, record }) => {
     )
     const id = linkButtons.length
     linkButtons.push(<span key={`link-${record.id}-${id}`}>{link}</span>)
-  }
-
-  if (config.lastFMEnabled) {
-    // No agent may be enabled to supply a canonical URL, so fall back to a name-based one.
-    const lastFMUrl =
-      (lastFMlink && isLastFmURL(lastFMlink[2]) && lastFMlink[2]) ||
-      (isLastFmURL(artistInfo?.lastFmUrl) && artistInfo.lastFmUrl) ||
-      (record.name &&
-        `https://last.fm/music/${encodeURIComponent(record.name)}`)
-    if (lastFMUrl) {
-      addLink(
-        lastFMUrl,
-        'message.openIn.lastfm',
-        <ImLastfm2 className="lastfm-icon" />,
-      )
-    }
   }
 
   artistInfo?.musicBrainzId &&

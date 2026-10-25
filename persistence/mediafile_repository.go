@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -24,6 +25,12 @@ import (
 
 type mediaFileRepository struct {
 	sqlRepository
+}
+
+// Trashed rows retain their identity and references but are invisible to normal reads,
+// including scanner move matching. Restore uses SetTrashed rather than a public filter.
+func (r *mediaFileRepository) newSelect(ctx context.Context, options ...model.QueryOptions) SelectBuilder {
+	return r.sqlRepository.newSelect(ctx, options...).Where(Eq{"media_file.trashed": false})
 }
 
 type dbMediaFile struct {
@@ -182,10 +189,21 @@ func (r *mediaFileRepository) Exists(ctx context.Context, id string) (bool, erro
 }
 
 func (r *mediaFileRepository) Put(ctx context.Context, m *model.MediaFile) error {
+	// A scanner rediscovering a path must not overwrite the retained trash record.
+	if m.ID != "" {
+		trashed, err := r.sqlRepository.exists(ctx, Eq{"id": m.ID, "trashed": true})
+		if err != nil {
+			return err
+		}
+		if trashed {
+			return model.ErrNotFound
+		}
+	}
+	m.Trashed = false
 	if m.CreatedAt.IsZero() {
 		m.CreatedAt = time.Now()
 	}
-	id, err := r.putByMatch(ctx, Eq{"path": m.Path, "library_id": m.LibraryID}, m.ID, &dbMediaFile{MediaFile: m})
+	id, err := r.putByMatch(ctx, Eq{"path": m.Path, "library_id": m.LibraryID, "trashed": false}, m.ID, &dbMediaFile{MediaFile: m})
 	if err != nil {
 		return err
 	}
@@ -199,6 +217,33 @@ func (r *mediaFileRepository) Put(ctx context.Context, m *model.MediaFile) error
 func (r *mediaFileRepository) UpdateProbeData(ctx context.Context, id string, data string) error {
 	_, err := r.executeSQL(ctx, Update(r.tableName).Set("probe_data", data).Where(Eq{"id": id}))
 	return err
+}
+
+func (r *mediaFileRepository) SetTrashed(ctx context.Context, id string, trashed bool) error {
+	if !loggedUser(ctx).IsAdmin {
+		return rest.ErrPermissionDenied
+	}
+	count, err := r.executeSQL(ctx, Update(r.tableName).
+		Set("trashed", trashed).
+		Set("missing", trashed).
+		Where(Eq{"id": id}))
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return model.ErrNotFound
+	}
+	var playlists []string
+	if err := r.queryAllSlice(ctx, Select("distinct playlist_id").From("playlist_tracks").Where(Eq{"media_file_id": id}), &playlists); err != nil {
+		return err
+	}
+	playlistRepo := NewPlaylistRepository(r.db).(*playlistRepository)
+	for _, playlistID := range playlists {
+		if err := playlistRepo.refreshCounters(ctx, &model.Playlist{ID: playlistID}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *mediaFileRepository) selectMediaFile(ctx context.Context, options ...model.QueryOptions) SelectBuilder {
@@ -253,7 +298,7 @@ func (r *mediaFileRepository) GetRandom(ctx context.Context, options ...model.Qu
 		opt = options[0]
 	}
 
-	rowidQuery := Select("media_file.rowid").From(r.tableName)
+	rowidQuery := Select("media_file.rowid").From(r.tableName).Where(Eq{"media_file.trashed": false})
 	rowidQuery = r.applyFilters(rowidQuery, model.QueryOptions{Filters: opt.Filters})
 	rowidQuery = r.applyLibraryFilter(ctx, rowidQuery)
 	rowidQuery = rowidQuery.OrderBy("random()")
@@ -336,7 +381,7 @@ func (r *mediaFileRepository) GetAlbumIDsByFolder(ctx context.Context, lib model
 			Or{Eq{"f.id": chunk}, Eq{"f.parent_id": chunk}},
 		})
 		sq := Select("distinct album_id").From("media_file").
-			Where(And{Eq{"missing": false}, ConcatExpr("folder_id IN (", inFolders, ")")})
+			Where(And{Eq{"missing": false, "trashed": false}, ConcatExpr("folder_id IN (", inFolders, ")")})
 		var chunkIDs []string
 		if err := r.queryAllSlice(ctx, sq, &chunkIDs); err != nil {
 			return nil, err
@@ -404,7 +449,46 @@ func (r *mediaFileRepository) FindByPaths(ctx context.Context, paths []string) (
 }
 
 func (r *mediaFileRepository) Delete(ctx context.Context, id string) error {
-	return r.delete(ctx, Eq{"id": id})
+	return r.delete(ctx, Eq{"id": id, "trashed": false})
+}
+
+// PurgeTrashed is used only by the durable trash journal inside an immediate
+// transaction. It deliberately bypasses the normal read filter, but never
+// deletes a restored row. The missing-row case makes crash recovery idempotent.
+func (r *mediaFileRepository) PurgeTrashed(ctx context.Context, id string) error {
+	if !loggedUser(ctx).IsAdmin {
+		return rest.ErrPermissionDenied
+	}
+	var row struct{ Trashed bool }
+	err := r.queryOne(ctx, Select("trashed").From(r.tableName).Where(Eq{"id": id}), &row)
+	if err != nil && !errors.Is(err, model.ErrNotFound) {
+		return err
+	}
+	if err == nil && !row.Trashed {
+		return model.ErrNotTrashed
+	}
+	var playlists []string
+	if err := r.queryAllSlice(ctx, Select("distinct playlist_id").From("playlist_tracks").Where(Eq{"media_file_id": id}), &playlists); err != nil {
+		return err
+	}
+	for _, table := range []string{"annotation", "bookmark"} {
+		if _, err := r.executeSQL(ctx, Delete(table).Where(Eq{"item_id": id, "item_type": "media_file"})); err != nil {
+			return err
+		}
+	}
+	if _, err := r.executeSQL(ctx, Delete("playlist_tracks").Where(Eq{"media_file_id": id})); err != nil {
+		return err
+	}
+	if err := r.delete(ctx, Eq{"id": id, "trashed": true}); err != nil {
+		return err
+	}
+	playlistRepo := NewPlaylistRepository(r.db).(*playlistRepository)
+	for _, playlistID := range playlists {
+		if err := playlistRepo.renumber(ctx, playlistID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *mediaFileRepository) ReassignReferences(ctx context.Context, prevID, newID string) error {
@@ -435,7 +519,7 @@ func (r *mediaFileRepository) DeleteAllMissing(ctx context.Context) (int64, erro
 	if !user.IsAdmin {
 		return 0, rest.ErrPermissionDenied
 	}
-	del := Delete(r.tableName).Where(Eq{"missing": true})
+	del := Delete(r.tableName).Where(Eq{"missing": true, "trashed": false})
 	return r.executeSQL(ctx, del)
 }
 
@@ -447,6 +531,7 @@ func (r *mediaFileRepository) DeleteMissing(ctx context.Context, ids []string) e
 	return r.delete(ctx,
 		And{
 			Eq{"missing": true},
+			Eq{"trashed": false},
 			Eq{"id": ids},
 		},
 	)
@@ -458,7 +543,7 @@ func (r *mediaFileRepository) MarkMissing(ctx context.Context, missing bool, mfs
 		upd := Update(r.tableName).
 			Set("missing", missing).
 			Set("updated_at", time.Now()).
-			Where(Eq{"id": chunk})
+			Where(Eq{"id": chunk, "trashed": false})
 		c, err := r.executeSQL(ctx, upd)
 		if err != nil || c == 0 {
 			log.Error(ctx, "Error setting mediafile missing flag", "ids", chunk, err)
@@ -477,6 +562,7 @@ func (r *mediaFileRepository) MarkMissingByFolder(ctx context.Context, missing b
 			Where(And{
 				Eq{"folder_id": chunk},
 				Eq{"missing": !missing},
+				Eq{"trashed": false},
 			})
 		c, err := r.executeSQL(ctx, upd)
 		if err != nil {
@@ -583,7 +669,7 @@ func (r *mediaFileRepository) MatchesCriteria(ctx context.Context, id string, c 
 	}
 	sq := Select("count(*) as count").From("media_file")
 	sq = rulesSQL.applyExpressionJoins(sq, usr.ID)
-	sq = sq.Where(And{Eq{"media_file.id": id}, cond})
+	sq = sq.Where(And{Eq{"media_file.id": id, "media_file.trashed": false}, cond})
 	var res struct{ Count int64 }
 	if err := r.queryOne(ctx, sq, &res); err != nil {
 		return false, err

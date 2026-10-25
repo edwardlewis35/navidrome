@@ -1,6 +1,5 @@
 import React from 'react'
 import {
-  ReferenceManyField,
   ShowContextProvider,
   useShowContext,
   useShowController,
@@ -11,14 +10,11 @@ import PlaylistDetails from './PlaylistDetails'
 import PlaylistSongs from './PlaylistSongs'
 import PlaylistActions from './PlaylistActions'
 import {
-  Pagination,
+  ContinuousReferenceField as ReferenceManyField,
   Title,
   canChangeTracks,
-  getStoredPerPage,
   useResourceRefresh,
 } from '../common'
-
-const playlistTrackPerPageOptions = [100, 250, 500]
 
 const useStyles = makeStyles(
   (theme) => ({
@@ -48,10 +44,6 @@ const PlaylistShowLayout = (props) => {
           reference="playlistTrack"
           target="playlist_id"
           sort={{ field: 'id', order: 'ASC' }}
-          perPage={getStoredPerPage(
-            'playlistTrack',
-            playlistTrackPerPageOptions,
-          )}
           filter={{ playlist_id: props.id }}
         >
           <PlaylistSongs
@@ -66,9 +58,6 @@ const PlaylistShowLayout = (props) => {
             }
             resource={'playlistTrack'}
             exporter={false}
-            pagination={
-              <Pagination rowsPerPageOptions={playlistTrackPerPageOptions} />
-            }
           />
         </ReferenceManyField>
       )}

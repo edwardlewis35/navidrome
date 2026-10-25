@@ -12,6 +12,7 @@ import (
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/model/criteria"
 	"github.com/navidrome/navidrome/model/id"
+	"github.com/navidrome/navidrome/model/request"
 	"github.com/navidrome/navidrome/utils/slice"
 )
 
@@ -45,8 +46,39 @@ func (m *MockMediaFileRepo) SetError(err bool) {
 	m.Err = err
 }
 
+func (m *MockMediaFileRepo) SetTrashed(ctx context.Context, id string, trashed bool) error {
+	user, ok := request.UserFrom(ctx)
+	if !ok || !user.IsAdmin {
+		return rest.ErrPermissionDenied
+	}
+	if m.Err {
+		return errors.New("error")
+	}
+	if mf, ok := m.Data[id]; ok {
+		mf.Trashed = trashed
+		mf.Missing = trashed
+		return nil
+	}
+	return model.ErrNotFound
+}
+
 func (m *MockMediaFileRepo) SetCountAll(count int64) {
 	m.CountAllValue = &count
+}
+
+func (m *MockMediaFileRepo) PurgeTrashed(ctx context.Context, id string) error {
+	user, ok := request.UserFrom(ctx)
+	if !ok || !user.IsAdmin {
+		return rest.ErrPermissionDenied
+	}
+	if m.Err {
+		return errors.New("error")
+	}
+	if mf, ok := m.Data[id]; ok && !mf.Trashed {
+		return model.ErrNotTrashed
+	}
+	delete(m.Data, id)
+	return nil
 }
 
 func (m *MockMediaFileRepo) SetData(mfs model.MediaFiles) {
@@ -60,15 +92,15 @@ func (m *MockMediaFileRepo) Exists(_ context.Context, id string) (bool, error) {
 	if m.Err {
 		return false, errors.New("error")
 	}
-	_, found := m.Data[id]
-	return found, nil
+	mf, found := m.Data[id]
+	return found && !mf.Trashed, nil
 }
 
 func (m *MockMediaFileRepo) Get(_ context.Context, id string) (*model.MediaFile, error) {
 	if m.Err {
 		return nil, errors.New("error")
 	}
-	if d, ok := m.Data[id]; ok {
+	if d, ok := m.Data[id]; ok && !d.Trashed {
 		// Intentionally clone the file and remove participants. This should
 		// catch any caller that actually means to call GetWithParticipants
 		res := *d
@@ -90,7 +122,7 @@ func (m *MockMediaFileRepo) GetWithParticipants(_ context.Context, id string) (*
 	if m.Err {
 		return nil, errors.New("error")
 	}
-	if d, ok := m.Data[id]; ok {
+	if d, ok := m.Data[id]; ok && !d.Trashed {
 		return d, nil
 	}
 	return nil, model.ErrNotFound
@@ -108,6 +140,7 @@ func (m *MockMediaFileRepo) GetAll(_ context.Context, qo ...model.QueryOptions) 
 		return nil, errors.New("error")
 	}
 	values := slices.Collect(maps.Values(m.Data))
+	values = slice.Filter(values, func(mf *model.MediaFile) bool { return !mf.Trashed })
 	result := slice.Map(values, func(p *model.MediaFile) model.MediaFile {
 		return *p
 	})
@@ -175,6 +208,9 @@ func (m *MockMediaFileRepo) Delete(_ context.Context, id string) error {
 	}
 	if _, ok := m.Data[id]; !ok {
 		return model.ErrNotFound
+	}
+	if m.Data[id].Trashed {
+		return nil
 	}
 	delete(m.Data, id)
 	return nil
@@ -247,7 +283,7 @@ func (m *MockMediaFileRepo) GetMissingAndMatching(_ context.Context, libId int) 
 	}
 	var res model.MediaFiles
 	for _, a := range m.Data {
-		if a.LibraryID == libId && a.Missing {
+		if a.LibraryID == libId && a.Missing && !a.Trashed {
 			res = append(res, *a)
 		}
 	}
@@ -285,7 +321,13 @@ func (m *MockMediaFileRepo) CountAll(_ context.Context, opts ...model.QueryOptio
 	if m.CountAllValue != nil {
 		return *m.CountAllValue, nil
 	}
-	return int64(len(m.Data)), nil
+	var count int64
+	for _, mf := range m.Data {
+		if !mf.Trashed {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (m *MockMediaFileRepo) DeleteAllMissing(_ context.Context) (int64, error) {
@@ -298,7 +340,7 @@ func (m *MockMediaFileRepo) DeleteAllMissing(_ context.Context) (int64, error) {
 	// Remove all missing files from Data
 	var count int64
 	for id, mf := range m.Data {
-		if mf.Missing {
+		if mf.Missing && !mf.Trashed {
 			delete(m.Data, id)
 			count++
 		}

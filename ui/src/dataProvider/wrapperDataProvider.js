@@ -1,6 +1,11 @@
 import jsonServerProvider from 'ra-data-json-server'
 import httpClient from './httpClient'
 import { REST_URL } from '../consts'
+import { createAIDataProvider } from './aiDataProvider'
+import { createSongManagementProvider } from './songManagementProvider'
+import { createOnlineCoverProvider } from './onlineCoverProvider'
+import { createCoverSettingsProvider } from './coverSettingsProvider'
+import { createEnglishRadioProvider } from './englishRadioProvider'
 
 const dataProvider = jsonServerProvider(REST_URL, httpClient)
 
@@ -156,6 +161,11 @@ const createPlayer = async (resource, params) => {
 
 const wrapperDataProvider = {
   ...dataProvider,
+  ...createAIDataProvider(httpClient),
+  ...createSongManagementProvider(httpClient),
+  ...createOnlineCoverProvider(httpClient),
+  ...createCoverSettingsProvider(httpClient),
+  ...createEnglishRadioProvider(httpClient),
   getList: (resource, params) => {
     const [r, p] = mapResource(resource, params)
     return dataProvider.getList(r, p)
@@ -227,6 +237,28 @@ const wrapperDataProvider = {
       ({ json }) => ({ data: json }),
     )
   },
+  moveSongToTrash: (songId) =>
+    httpClient(`${REST_URL}/song/${encodeURIComponent(songId)}`, {
+      method: 'DELETE',
+    }).then(({ json }) => ({ data: json })),
+  getSongTrash: () =>
+    httpClient(`${REST_URL}/trash`).then(({ json }) => ({ data: json })),
+  restoreSongFromTrash: (trashId) =>
+    httpClient(`${REST_URL}/trash/${encodeURIComponent(trashId)}/restore`, {
+      method: 'POST',
+    }).then(({ json }) => ({ data: json })),
+  permanentlyDeleteSongFromTrash: (trashId) =>
+    httpClient(`${REST_URL}/trash/${encodeURIComponent(trashId)}`, {
+      method: 'DELETE',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ confirm: true }),
+    }).then(({ json }) => ({ data: json })),
+  emptySongTrash: (ids) =>
+    httpClient(`${REST_URL}/trash`, {
+      method: 'DELETE',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ confirm: true, ids }),
+    }).then(({ json }) => ({ data: json })),
   lookupQuickConnect: (code) =>
     httpClient(
       `${REST_URL}/quickconnect?code=${encodeURIComponent(code)}`,

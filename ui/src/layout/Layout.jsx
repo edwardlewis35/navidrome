@@ -8,6 +8,9 @@ import AppBar from './AppBar'
 import Notification from './Notification'
 import useCurrentTheme from '../themes/useCurrentTheme'
 import { useSearchRefocus } from '../common'
+import MusicMenu from './MusicMenu'
+import MusicIdlePlayer from './MusicIdlePlayer'
+import { ThemeProvider, createMuiTheme } from '@material-ui/core/styles'
 
 const useStyles = makeStyles({
   root: { paddingBottom: (props) => (props.addPadding ? '80px' : 0) },
@@ -16,7 +19,9 @@ const useStyles = makeStyles({
 const Layout = (props) => {
   const theme = useCurrentTheme()
   const queue = useSelector((state) => state.player?.queue)
-  const classes = useStyles({ addPadding: queue.length > 0 })
+  const classes = useStyles({
+    addPadding: queue.length > 0 || theme.cloudMusic,
+  })
   const dispatch = useDispatch()
   useSearchRefocus()
 
@@ -29,11 +34,16 @@ const Layout = (props) => {
       <RALayout
         {...props}
         className={classes.root}
-        menu={Menu}
+        menu={theme.cloudMusic ? MusicMenu : Menu}
         appBar={AppBar}
         theme={theme}
         notification={Notification}
       />
+      {theme.cloudMusic && queue.length === 0 && (
+        <ThemeProvider theme={createMuiTheme(theme)}>
+          <MusicIdlePlayer />
+        </ThemeProvider>
+      )}
     </HotKeys>
   )
 }

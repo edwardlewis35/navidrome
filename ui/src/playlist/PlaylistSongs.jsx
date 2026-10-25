@@ -8,6 +8,7 @@ import {
   useNotify,
   useVersion,
   useListContext,
+  usePermissions,
   FunctionField,
 } from 'react-admin'
 import clsx from 'clsx'
@@ -91,6 +92,7 @@ const ReorderableList = ({ readOnly, children, ...rest }) => {
 }
 
 const PlaylistSongs = ({ playlistId, readOnly, actions, ...props }) => {
+  const { permissions } = usePermissions()
   const listContext = useListContext()
   const { data, ids, selectedIds, onUnselectItems, refetch, setPage } =
     listContext
@@ -226,7 +228,7 @@ const PlaylistSongs = ({ playlistId, readOnly, actions, ...props }) => {
             <SongDatagrid
               rowClick={(id) => dispatch(playTracks(data, ids, id))}
               {...listContext}
-              hasBulkActions={!readOnly}
+              hasBulkActions={!readOnly || permissions === 'admin'}
               contextAlwaysVisible={!isDesktop}
               classes={{ row: classes.row }}
             >
@@ -241,7 +243,7 @@ const PlaylistSongs = ({ playlistId, readOnly, actions, ...props }) => {
         </Card>
       </div>
       <ExpandInfoDialog content={<SongInfo />} />
-      {React.cloneElement(props.pagination, listContext)}
+      {props.pagination && React.cloneElement(props.pagination, listContext)}
     </>
   )
 }

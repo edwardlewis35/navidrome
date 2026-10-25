@@ -1,0 +1,201 @@
+name: NetEase UI Docker image
+
+on:
+  push:
+    branches:
+      - codex/netease-music-ui
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netease-ui-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Validate music management and playback compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Test recovery, API access and library visibility
+        run: go test -count=1 -shuffle=on -tags netgo,sqlite_fts5 ./conf/... ./cmd/... ./core/... ./model/... ./persistence/... ./server/nativeapi/... ./server/subsonic/... ./scanner/...
+
+  ui:
+    name: Validate music interface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        working-directory: ui
+        run: npm ci
+      - name: Check formatting and lint
+        working-directory: ui
+        run: npm run check-formatting && npm run lint
+      - name: Run interface tests
+        working-directory: ui
+        run: npm test
+      - name: Build interface
+        working-directory: ui
+        run: npm run build
+
+  build:
+    name: Build and smoke-test (${{ matrix.arch }})
+    needs: [ui, backend]
+    if: github.ref == 'refs/heads/codex/netease-music-ui'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set image and version
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
+
+      # Publish by digest first. Named tags move only after both platforms pass.
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          target: final
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ steps.image.outputs.name }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            GIT_SHA=${{ steps.image.outputs.short_sha }}
+            GIT_TAG=netease-ui-${{ steps.image.outputs.short_sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Navidrome NetEase-style UI
+            org.opencontainers.image.version=netease-ui-${{ steps.image.outputs.short_sha }}
+          cache-from: type=gha,scope=netease-ui-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=netease-ui-${{ matrix.arch }}
+
+      - name: Smoke-test server and bundled interface
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm "$IMAGE" --help > /dev/null
+          docker run -d --name navidrome-smoke \
+            -p 127.0.0.1:4533:4533 \
+            -e ND_ENABLEINSIGHTSCOLLECTOR=false \
+            "$IMAGE"
+          trap 'docker logs navidrome-smoke; docker rm -fv navidrome-smoke' EXIT
+          curl --fail --retry 30 --retry-connrefused --retry-all-errors \
+            --retry-delay 2 --retry-max-time 120 --max-time 5 \
+            http://127.0.0.1:4533/ping
+          curl --fail --location http://127.0.0.1:4533/app/ > /tmp/navidrome-ui.html
+          grep -q '<div id="root"' /tmp/navidrome-ui.html
+          asset=$(grep -oE 'src="[^"]*assets/[^"]+\.js"' /tmp/navidrome-ui.html | head -1 | cut -d '"' -f 2)
+          test -n "$asset"
+          curl --fail "http://127.0.0.1:4533/app/${asset#./}" > /dev/null
+
+      - name: Export verified digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: netease-ui-digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish verified multi-platform image
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set image and version
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: netease-ui-digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Publish tags and verify platforms
+        working-directory: /tmp/digests
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          SHORT_SHA: ${{ steps.image.outputs.short_sha }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:netease-ui" \
+            --tag "$IMAGE:sha-$SHORT_SHA" \
+            $(printf "$IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$IMAGE:netease-ui"
+          docker buildx imagetools inspect --raw "$IMAGE:netease-ui" > /tmp/manifest.json
+          jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] | unique | sort == ["amd64", "arm64"]' /tmp/manifest.json
+          {
+            echo '### NetEase-style Navidrome image'
+            echo
+            echo "\`docker pull $IMAGE:netease-ui\`"
+            echo
+            echo "Commit image: \`$IMAGE:sha-$SHORT_SHA\`"
+            echo
+            echo 'Platforms: linux/amd64, linux/arm64. Both passed server and UI smoke tests.'
+          } >> "$GITHUB_STEP_SUMMARY"

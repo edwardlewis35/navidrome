@@ -99,17 +99,16 @@ func hydrateMediaFileArtwork(ctx context.Context, db dbx.Builder, mfs model.Medi
 	var eligibleIDs []string
 	for i := range mfs {
 		albumIDs[i] = mfs[i].AlbumID
-		if mfs[i].HasCoverArt && conf.Server.EnableMediaFileCoverArt {
-			eligibleIDs = append(eligibleIDs, mfs[i].ID)
-		}
+		eligibleIDs = append(eligibleIDs, mfs[i].ID)
 	}
 	albumInfos := hydrateItemImages(ctx, db, model.KindAlbumArtwork, albumIDs)
 	mfInfos := hydrateItemImages(ctx, db, model.KindMediaFileArtwork, eligibleIDs)
 	for i := range mfs {
 		mf := &mfs[i]
 		applyItemImage(albumInfos, mf.AlbumID, &mf.AlbumImage)
-		eligible := mf.HasCoverArt && conf.Server.EnableMediaFileCoverArt
 		ownInfo, ownResolved := mfInfos[mf.ID]
+		mf.CustomCover = ownResolved && ownInfo.CustomCover
+		eligible := mf.CustomCover || (mf.HasCoverArt && conf.Server.EnableMediaFileCoverArt)
 		if eligible && ownResolved && !ownInfo.Absent() {
 			mf.ItemImage = ownInfo.Image()
 			continue

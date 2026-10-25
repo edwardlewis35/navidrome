@@ -1,6 +1,41 @@
 {
   "languageName": "English",
   "resources": {
+    "musicManagement": {
+      "selectionInvalid": "Select up to 250 loaded songs per operation. Refresh the list if playlist entries are unavailable.",
+      "matchCover": "Match artwork online",
+      "moveSelected": "Move selected to trash",
+      "deleteSelected": "Permanently delete selected",
+      "trashTitle": "Move selected songs to trash?",
+      "permanentTitle": "Permanently delete selected songs?",
+      "trashDescription": "Move %{count} selected songs into the recoverable trash. This also removes files from any service sharing this music directory.",
+      "permanentDescription": "Permanently delete %{count} selected songs and their audio files. This cannot be undone. Shared music libraries are affected.",
+      "result": "Completed: %{completed}. Failed or unfinished: %{failed}. Pending permanent deletions: %{pending}. Refresh the library and trash for current state.",
+      "failed": "The operation did not finish. Refresh the library and trash before retrying.",
+      "deleteOne": "Permanently delete song",
+      "permanentOneTitle": "Permanently delete this song?",
+      "permanentOneDescription": "The audio file and its library records will be permanently deleted. This cannot be undone and affects services sharing this music directory.",
+      "deleted": "Song permanently deleted",
+      "pending": "Permanent deletion did not finish. Refresh the trash; an interrupted confirmed deletion will finish during recovery."
+    },
+    "upload": {
+      "name": "Upload music",
+      "description": "Upload audio into a local music library, then refresh its database. Existing files are never overwritten. Services sharing this directory will also see the files.",
+      "library": "Destination library",
+      "folder": "Existing subfolder (optional)",
+      "folderHelp": "Leave blank for the library root, or enter an existing relative folder such as Artist/Album.",
+      "choose": "Choose audio files",
+      "start": "Upload and refresh",
+      "uploading": "Uploading / refreshing…",
+      "scan": "Refresh library",
+      "selected": "Selected files: %{count}",
+      "limits": "Choose at most 25 audio files, up to 512 MiB each.",
+      "loadFailed": "Could not load local libraries",
+      "failed": "Upload failed",
+      "scanFailed": "Library refresh failed",
+      "complete": "Uploaded and library refreshed",
+      "saved": "File saved; library refresh unfinished"
+    },
     "song": {
       "name": "Song |||| Songs",
       "fields": {
@@ -163,7 +198,7 @@
       "helperTexts": {
         "name": "Changes to your name will only be reflected on next login",
         "libraries": "Select specific libraries for this user, or leave empty to use default libraries",
-        "scrobbleFilter": "Songs matching these smart playlist rules are not sent to Last.fm, ListenBrainz or scrobbler plugins. Uses the same JSON syntax and behavior as smart playlists. Example: {\"all\":[{\"lt\":{\"rating\":4}}]}. Leave empty to scrobble everything. Local play counts are not affected."
+        "scrobbleFilter": "Songs matching these smart playlist rules are not sent to ListenBrainz. Uses the same JSON syntax and behavior as smart playlists. Example: {\"all\":[{\"lt\":{\"rating\":4}}]}. Leave empty to scrobble everything. Local play counts are not affected."
       },
       "notifications": {
         "created": "User created",
@@ -457,6 +492,43 @@
         "configKey": "key",
         "configValue": "value"
       }
+    },
+    "trash": {
+      "name": "Trash",
+      "moveToTrash": "Move to trash",
+      "confirmTitle": "Move song to trash?",
+      "confirmDescription": "The audio file will move to recoverable trash. Other servers using this same music folder will lose access to it until you restore it. You can restore the song from Trash.",
+      "cancel": "Cancel",
+      "moved": "Song moved to trash",
+      "moveFailed": "Could not move the song to trash.",
+      "description": "Audio files kept here can be restored to their original location. Song details, favourites and playlist memberships are retained.",
+      "empty": "Trash is empty.",
+      "loading": "Loading trash",
+      "loadFailed": "Could not load trash.",
+      "retry": "Try again",
+      "refresh": "Refresh",
+      "restore": "Restore",
+      "restored": "Song restored",
+      "restoreFailed": "Could not restore the song.",
+      "permanentDelete": "Delete permanently",
+      "emptyTrash": "Empty trash",
+      "permanentDeleteConfirmTitle": "Permanently delete this song?",
+      "permanentDeleteConfirmDescription": "The audio file and its saved song data will be permanently deleted. This cannot be undone.",
+      "emptyConfirmTitle": "Empty trash permanently?",
+      "emptyConfirmDescription": "Number of songs to permanently delete: %{count}. Their audio files and saved song data will also be deleted. This cannot be undone.",
+      "permanentlyDeleted": "Song permanently deleted",
+      "emptied": "Selected trash entries permanently deleted",
+      "permanentDeleteFailed": "Could not permanently delete the song.",
+      "emptyFailed": "Could not empty trash.",
+      "partiallyEmptied": "Songs permanently deleted before the operation stopped: %{count}.",
+      "accessDenied": "Only administrators can access Trash.",
+      "fields": {
+        "song": "Song",
+        "path": "Original file path",
+        "deletedAt": "Moved to trash",
+        "deletedBy": "Moved by",
+        "actions": "Actions"
+      }
     }
   },
   "ra": {
@@ -651,7 +723,12 @@
     "shareSuccess": "URL copied to clipboard: %{url}",
     "shareFailure": "Error copying URL %{url} to clipboard",
     "downloadDialogTitle": "Download %{resource} '%{name}' (%{size})",
-    "downloadOriginalFormat": "Download in original format"
+    "downloadOriginalFormat": "Download in original format",
+    "continuousLoading": "Loading more…",
+    "continuousLoadMore": "Load more",
+    "continuousLoadFailed": "Could not load more items. Please try again.",
+    "continuousCount": "%{loaded} of %{total} items loaded",
+    "continuousRetry": "Try again"
   },
   "menu": {
     "library": "Library",

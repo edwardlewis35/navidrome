@@ -82,7 +82,7 @@ func (r *playlistRepository) Tracks(ctx context.Context, playlistId string, refr
 func (r *playlistTrackRepository) CountAll(ctx context.Context, options ...model.QueryOptions) (int64, error) {
 	query := Select().
 		Join("media_file f on f.id = media_file_id").
-		Where(Eq{"playlist_id": r.playlistId})
+		Where(Eq{"playlist_id": r.playlistId, "f.trashed": false})
 	query = r.applyLibraryFilter(ctx, query, "f")
 	return r.count(ctx, query, options...)
 }
@@ -90,7 +90,7 @@ func (r *playlistTrackRepository) CountAll(ctx context.Context, options ...model
 func (r *playlistTrackRepository) Count(ctx context.Context, options ...rest.QueryOptions) (int64, error) {
 	query := Select().
 		LeftJoin("media_file f on f.id = media_file_id").
-		Where(Eq{"playlist_id": r.playlistId})
+		Where(Eq{"playlist_id": r.playlistId, "f.trashed": false})
 	query = r.applyLibraryFilter(ctx, query, "f")
 	return r.count(ctx, query, r.parseRestOptions(ctx, options...))
 }
@@ -113,7 +113,7 @@ func (r *playlistTrackRepository) Read(ctx context.Context, id string) (*model.P
 			"playlist_tracks.*",
 		).
 		Join("media_file f on f.id = media_file_id").
-		Where(And{Eq{"playlist_id": r.playlistId}, Eq{"playlist_tracks.id": id}})
+		Where(And{Eq{"playlist_id": r.playlistId}, Eq{"playlist_tracks.id": id}, Eq{"f.trashed": false}})
 	sel = r.applyLibraryFilter(ctx, sel, "f")
 	var trk dbPlaylistTrack
 	err := r.queryOne(ctx, sel, &trk)
@@ -146,7 +146,7 @@ func (r *playlistTrackRepository) GetCursor(ctx context.Context, options ...mode
 func (r *playlistTrackRepository) GetMediaFileIDs(ctx context.Context, options ...model.QueryOptions) ([]string, error) {
 	query := r.newSelect(ctx, options...).Columns("media_file_id").
 		Join("media_file f on f.id = media_file_id").
-		Where(Eq{"playlist_id": r.playlistId})
+		Where(Eq{"playlist_id": r.playlistId, "f.trashed": false})
 	query = r.applyLibraryFilter(ctx, query, "f")
 	var ids []string
 	if err := r.queryAllSlice(ctx, query, &ids); err != nil {
@@ -158,7 +158,7 @@ func (r *playlistTrackRepository) GetMediaFileIDs(ctx context.Context, options .
 func (r *playlistTrackRepository) GetAlbumIDs(ctx context.Context, options ...model.QueryOptions) ([]string, error) {
 	query := r.newSelect(ctx, options...).Columns("distinct mf.album_id").
 		Join("media_file mf on mf.id = media_file_id").
-		Where(Eq{"playlist_id": r.playlistId})
+		Where(Eq{"playlist_id": r.playlistId, "mf.trashed": false})
 	query = r.applyLibraryFilter(ctx, query, "mf")
 	var ids []string
 	err := r.queryAllSlice(ctx, query, &ids)
@@ -219,7 +219,7 @@ func (r *playlistTrackRepository) Insert(ctx context.Context, mediaFileIds []str
 }
 
 func (r *playlistTrackRepository) addMediaFileIds(ctx context.Context, cond Sqlizer) (int, error) {
-	sq := Select("id").From("media_file").Where(cond).OrderBy("album_artist, album, release_date, disc_number, track_number")
+	sq := Select("id").From("media_file").Where(cond).Where(Eq{"trashed": false}).OrderBy("album_artist, album, release_date, disc_number, track_number")
 	var ids []string
 	err := r.queryAllSlice(ctx, sq, &ids)
 	if err != nil {

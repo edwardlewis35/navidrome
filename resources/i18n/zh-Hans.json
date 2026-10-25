@@ -1,6 +1,41 @@
 {
   "languageName": "简体中文",
   "resources": {
+    "musicManagement": {
+      "selectionInvalid": "每次最多操作 250 首已加载的歌曲；若歌单条目已不可用，请先刷新列表。",
+      "matchCover": "从网络匹配封面",
+      "moveSelected": "所选歌曲移入回收站",
+      "deleteSelected": "永久删除所选歌曲",
+      "trashTitle": "将所选歌曲移入回收站？",
+      "permanentTitle": "永久删除所选歌曲？",
+      "trashDescription": "将 %{count} 首所选歌曲移入可恢复的回收站。共用此音乐目录的其他服务也会受到影响。",
+      "permanentDescription": "永久删除 %{count} 首所选歌曲及其音频文件，无法恢复。共用此音乐目录的其他服务也会受到影响。",
+      "result": "已完成 %{completed} 首；失败或未完成 %{failed} 首；待完成的永久删除 %{pending} 首。请刷新曲库和回收站查看当前状态。",
+      "failed": "操作未完成，请先刷新曲库和回收站再重试。",
+      "deleteOne": "永久删除歌曲",
+      "permanentOneTitle": "永久删除这首歌曲？",
+      "permanentOneDescription": "音频文件和曲库记录将被永久删除，无法恢复，共用此音乐目录的其他服务也会受到影响。",
+      "deleted": "歌曲已永久删除",
+      "pending": "永久删除尚未完成。请刷新回收站；已确认但中断的永久删除会在恢复检查时继续完成。"
+    },
+    "upload": {
+      "name": "上传音乐",
+      "description": "将音频文件上传到本地音乐库并刷新数据库。已有文件不会被覆盖，共用此目录的其他服务也会看到这些文件。",
+      "library": "目标音乐库",
+      "folder": "已有子目录（可选）",
+      "folderHelp": "留空上传到音乐库根目录，或填写已有的相对子目录，例如 歌手/专辑。",
+      "choose": "选择音频文件",
+      "start": "上传并刷新曲库",
+      "uploading": "正在上传 / 刷新…",
+      "scan": "刷新曲库",
+      "selected": "已选择 %{count} 个文件",
+      "limits": "每次最多选择 25 个音频文件，每个不超过 512 MiB。",
+      "loadFailed": "无法读取本地音乐库",
+      "failed": "上传失败",
+      "scanFailed": "曲库刷新失败",
+      "complete": "已上传并刷新曲库",
+      "saved": "文件已保存，曲库刷新尚未完成"
+    },
     "song": {
       "name": "歌曲",
       "fields": {
@@ -162,7 +197,7 @@
       "helperTexts": {
         "name": "名称的更改将在下次登录时生效",
         "libraries": "为此用户选择指定媒体库，留空则使用默认媒体库",
-        "scrobbleFilter": "符合这些智能歌单规则的歌曲不会发送到 Last.fm、ListenBrainz 或个性化记录插件。使用与智能歌单相同的 JSON 语法和行为。例如：{\"all\":[{\"lt\":{\"rating\":4}}]}。留空则记录所有播放。本地播放次数不受影响。"
+        "scrobbleFilter": "符合这些智能歌单规则的歌曲不会发送到 ListenBrainz。使用与智能歌单相同的 JSON 语法和行为。例如：{\"all\":[{\"lt\":{\"rating\":4}}]}。留空则记录所有播放。本地播放次数不受影响。"
       },
       "notifications": {
         "created": "用户已创建",
@@ -420,6 +455,43 @@
         "configKey": "键",
         "configValue": "值"
       }
+    },
+    "trash": {
+      "name": "回收站",
+      "moveToTrash": "移至回收站",
+      "confirmTitle": "将歌曲移至回收站？",
+      "confirmDescription": "音频文件会移入可恢复的回收站。使用同一音乐文件夹的其他服务也将无法播放该文件，直到你将其恢复。之后可在回收站中还原歌曲。",
+      "cancel": "取消",
+      "moved": "歌曲已移至回收站",
+      "moveFailed": "无法将歌曲移至回收站。",
+      "description": "这里保存的音频文件可以恢复到原位置，歌曲信息、收藏和歌单关联会保留。",
+      "empty": "回收站为空。",
+      "loading": "正在加载回收站",
+      "loadFailed": "无法加载回收站。",
+      "retry": "重试",
+      "refresh": "刷新",
+      "restore": "恢复",
+      "restored": "歌曲已恢复",
+      "restoreFailed": "无法恢复歌曲。",
+      "permanentDelete": "永久删除",
+      "emptyTrash": "清空回收站",
+      "permanentDeleteConfirmTitle": "永久删除这首歌曲？",
+      "permanentDeleteConfirmDescription": "音频文件及其保存的歌曲数据将被永久删除，此操作无法撤销，也无法恢复。",
+      "emptyConfirmTitle": "永久清空回收站？",
+      "emptyConfirmDescription": "回收站当前的全部 %{count} 首歌曲及其音频文件、保存的歌曲数据将被永久删除，此操作无法撤销，也无法恢复。",
+      "permanentlyDeleted": "歌曲已永久删除",
+      "emptied": "已永久删除确认的回收站歌曲",
+      "permanentDeleteFailed": "无法永久删除歌曲。",
+      "emptyFailed": "无法清空回收站。",
+      "partiallyEmptied": "操作中断前已永久删除 %{count} 首歌曲。",
+      "accessDenied": "只有管理员可以访问回收站。",
+      "fields": {
+        "song": "歌曲",
+        "path": "原文件路径",
+        "deletedAt": "移入时间",
+        "deletedBy": "操作人",
+        "actions": "操作"
+      }
     }
   },
   "ra": {
@@ -611,7 +683,12 @@
     "shareSuccess": "URL 已复制: %{url}",
     "shareFailure": "URL 复制失败: %{url}",
     "downloadDialogTitle": "下载 %{resource} '%{name}' (%{size})",
-    "downloadOriginalFormat": "下载原始格式"
+    "downloadOriginalFormat": "下载原始格式",
+    "continuousLoading": "正在加载更多…",
+    "continuousLoadMore": "加载更多",
+    "continuousLoadFailed": "暂时无法加载更多内容，请重试。",
+    "continuousCount": "已显示 %{loaded} / %{total} 项",
+    "continuousRetry": "重试"
   },
   "menu": {
     "library": "媒体库",

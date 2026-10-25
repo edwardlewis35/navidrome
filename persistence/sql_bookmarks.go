@@ -102,6 +102,9 @@ func (r sqlRepository) GetBookmarks(ctx context.Context) (model.Bookmarks, error
 
 	idField := r.tableName + ".id"
 	sq := r.newSelect(ctx).Columns(r.tableName + ".*")
+	if r.tableName == "media_file" {
+		sq = sq.Where(Eq{"media_file.trashed": false})
+	}
 	sq = r.withAnnotation(ctx, sq, idField)
 	sq = r.withBookmark(ctx, sq, idField).Where(NotEq{bookmarkTable + ".item_id": nil})
 	sq = r.applyLibraryFilter(ctx, sq)
@@ -110,6 +113,9 @@ func (r sqlRepository) GetBookmarks(ctx context.Context) (model.Bookmarks, error
 	if err != nil {
 		log.Error(ctx, "Error getting mediafiles with bookmarks", "user", user.UserName, err)
 		return nil, err
+	}
+	if len(mfs) == 0 {
+		return model.Bookmarks{}, nil
 	}
 
 	ids := make([]string, len(mfs))

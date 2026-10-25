@@ -582,6 +582,8 @@ jobs:
   msi:
     name: Build Windows installers
     needs: [build, git-version]
+    # A fork without version tags cannot produce a versioned Windows installer.
+    if: needs.git-version.outputs.git_tag != ''
     runs-on: ubuntu-24.04
 
     steps:
