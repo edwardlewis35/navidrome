@@ -133,7 +133,8 @@ func mainContext(ctx context.Context) (context.Context, context.CancelFunc) {
 func startServer(ctx context.Context) func() error {
 	return func() error {
 		a := CreateServer()
-		a.MountRouter("Native API", consts.URLPathNativeAPI, CreateNativeAPIRouter(ctx))
+		nativeAPI := CreateNativeAPIRouter(ctx)
+		a.MountRouter("Native API", consts.URLPathNativeAPI, nativeAPI)
 		a.MountRouter("Subsonic API", consts.URLPathSubsonicAPI, CreateSubsonicAPIRouter(ctx))
 		a.MountRouter("Public Endpoints", consts.URLPathPublic, CreatePublicRouter())
 		if conf.Server.LastFM.Enabled {
@@ -160,6 +161,12 @@ func startServer(ctx context.Context) func() error {
 		if strings.HasPrefix(conf.Server.UILoginBackgroundURL, "/") {
 			a.MountRouter("Background images", conf.Server.UILoginBackgroundURL, backgrounds.NewHandler())
 		}
+		workerCtx, stopWorker := context.WithCancel(ctx)
+		workerDone := startDailyAIWorker(workerCtx, nativeAPI.AIMusicService(), time.Minute)
+		defer func() {
+			stopWorker()
+			<-workerDone
+		}()
 		return a.Run(ctx, conf.Server.Address, conf.Server.Port, conf.Server.TLSCert, conf.Server.TLSKey)
 	}
 }

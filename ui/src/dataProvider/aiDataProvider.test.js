@@ -18,6 +18,15 @@ describe('AI data provider', () => {
       ['/api/ai/settings'],
     ])
   })
+  it('reads saved daily recommendations without a request body or mutation', async () => {
+    httpClient.mockResolvedValue({
+      json: { state: 'ready', date: '2026-10-25', recommendations: [] },
+    })
+    await expect(provider.getAIDailyRecommendations()).resolves.toEqual({
+      data: { state: 'ready', date: '2026-10-25', recommendations: [] },
+    })
+    expect(httpClient).toHaveBeenCalledExactlyOnceWith('/api/ai/daily')
+  })
   it('sends configuration only to the settings endpoint and keeps only the server response', async () => {
     const settings = {
       enabled: true,

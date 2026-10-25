@@ -2,11 +2,26 @@ import { useLocale } from 'react-admin'
 
 const en = {
   title: 'AI music',
+  dailyTitle: 'Your daily music picks',
+  dailyDescription: 'Up to six daily picks from your library and beyond.',
+  dailySchedule: 'Updated in the background daily at 03:00, Shanghai time.',
+  dailyNextRun: 'Next scheduled update:',
+  dailyDate: 'Recommendations for',
+  dailySource: 'Inspired by playlist:',
+  dailyPending:
+    'Your daily picks are being prepared in the background. They will appear here when ready.',
+  dailyFailed:
+    'The last background analysis did not finish. Waiting for the next daily update.',
+  dailyStale:
+    'Today’s update is not ready. Enjoy the last saved picks for now.',
+  dailyEmpty:
+    'No saved songs are available to display. Your next daily picks will appear here.',
+  dailyLoadError: 'Could not load your saved daily picks. Try again.',
   discoverTitle: 'A new direction for your playlist',
   description:
     'Let AI explore your playlist and recommend songs from your library and beyond.',
   privacy:
-    'On your request, playlist names and song titles, artists, albums and genres are sent to your configured AI provider. Audio files, file paths and account details stay here.',
+    'Daily background analysis sends playlist names and song titles, artists, albums and genres to your configured AI provider. Audio files, file paths and account details stay here.',
   settings: 'AI settings',
   adminOnly: 'Only administrators can configure AI music.',
   enabled: 'Enable AI music',
@@ -60,10 +75,21 @@ const en = {
 
 const zh = {
   title: 'AI 音乐',
+  dailyTitle: '每日为你精选',
+  dailyDescription: '每天随机精选最多 6 首本地歌曲和曲库之外的音乐。',
+  dailySchedule: '后台每天北京时间 03:00 自动更新。',
+  dailyNextRun: '下次定时更新：',
+  dailyDate: '推荐日期：',
+  dailySource: '参考歌单：',
+  dailyPending: '后台正在准备每日推荐，生成后会自动显示在这里。',
+  dailyFailed: '本次后台分析未完成，等待下一次每日更新。',
+  dailyStale: '今天的推荐暂未更新，先听上次保存的精选。',
+  dailyEmpty: '当前没有可展示的已保存歌曲，等待下一次每日推荐。',
+  dailyLoadError: '暂时无法读取已保存的每日推荐，请重试。',
   discoverTitle: '从你的歌单，发现新的心动',
   description: '让 AI 分析歌单的音乐偏好，推荐本地歌曲和更多值得发现的音乐。',
   privacy:
-    '点击分析后，将向你配置的 AI 服务发送歌单名，以及歌曲的标题、歌手、专辑和曲风。音频文件、文件路径和账号信息不会发送。',
+    '每日后台分析时，会向你配置的 AI 服务发送歌单名，以及歌曲的标题、歌手、专辑和曲风。音频文件、文件路径和账号信息不会发送。',
   settings: 'AI 设置',
   adminOnly: '仅管理员可以配置 AI 音乐。',
   enabled: '启用 AI 音乐',

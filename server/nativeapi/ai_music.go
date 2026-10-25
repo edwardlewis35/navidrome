@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/deluan/rest"
 	"github.com/go-chi/chi/v5"
@@ -14,9 +15,21 @@ import (
 	"github.com/navidrome/navidrome/model"
 )
 
+// AIMusicService shares the provider concurrency limit between HTTP and background work.
+func (api *Router) AIMusicService() *core.AIMusic {
+	if api.aiMusic == nil {
+		api.aiMusic = core.NewAIMusic(api.ds, conf.Server.DataFolder.String())
+	}
+	return api.aiMusic
+}
+
 func (api *Router) addAIMusicRoutes(r chi.Router) {
-	svc := core.NewAIMusic(api.ds, conf.Server.DataFolder.String())
+	svc := api.AIMusicService()
 	r.Route("/ai", func(r chi.Router) {
+		r.Get("/daily", func(w http.ResponseWriter, r *http.Request) {
+			result, err := svc.Daily(r.Context(), time.Now())
+			aiMusicRespond(w, result, err)
+		})
 		r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 			status, err := svc.Status(r.Context())
 			aiMusicRespond(w, status, err)

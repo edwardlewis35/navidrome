@@ -1,20 +1,22 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AIRecommendations from './AIRecommendations'
 
 const mocks = vi.hoisted(() => ({
   permissions: 'admin',
+  locale: 'en',
   dispatch: vi.fn(),
   provider: {
+    getAIDailyRecommendations: vi.fn(),
     getAIStatus: vi.fn(),
     getList: vi.fn(),
     getAIRecommendations: vi.fn(),
   },
 }))
 vi.mock('react-admin', () => ({
-  useLocale: () => 'en',
+  useLocale: () => mocks.locale,
   usePermissions: () => ({ permissions: mocks.permissions }),
   useDataProvider: () => mocks.provider,
 }))
@@ -23,6 +25,35 @@ vi.mock('../common/Artwork', () => ({
   Artwork: ({ title }) => <img alt={title} />,
 }))
 
+const daily = {
+  configured: true,
+  state: 'ready',
+  date: '2026-10-25',
+  generatedAt: '2026-10-25T03:00:10+08:00',
+  nextRunAt: '2026-10-26T03:00:00+08:00',
+  sourcePlaylistName: 'Evening jazz',
+  stale: false,
+  analysis: 'Warm jazz textures',
+  recommendations: [
+    {
+      song: {
+        id: 'song',
+        title: 'Local song',
+        artist: 'Artist',
+        album: 'Album',
+      },
+      reason: 'Soft harmonies',
+    },
+  ],
+  externalRecommendations: [
+    {
+      title: 'Come Away With Me',
+      artist: 'Norah Jones',
+      reason: 'Gentle piano and warm vocals',
+    },
+  ],
+}
+
 const renderCard = () =>
   render(
     <MemoryRouter>
@@ -30,41 +61,86 @@ const renderCard = () =>
     </MemoryRouter>,
   )
 
-describe('AI music recommendations', () => {
+const expectNoGeneration = () => {
+  expect(mocks.provider.getAIRecommendations).not.toHaveBeenCalled()
+  expect(mocks.provider.getList).not.toHaveBeenCalled()
+  expect(mocks.provider.getAIStatus).not.toHaveBeenCalled()
+  expect(
+    screen.queryByRole('button', { name: 'Analyze and recommend' }),
+  ).toBeNull()
+  expect(screen.queryByRole('combobox')).toBeNull()
+}
+
+describe('saved daily AI music recommendations', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.permissions = 'admin'
-    mocks.provider.getAIStatus.mockResolvedValue({ data: { configured: true } })
-    mocks.provider.getList.mockResolvedValue({
-      data: [{ id: 'playlist', name: 'Evening jazz' }],
-      total: 1,
-    })
-    mocks.provider.getAIRecommendations.mockResolvedValue({
-      data: {
-        analysis: 'Warm jazz textures',
-        recommendations: [
-          {
-            song: {
-              id: 'song',
-              title: 'Local song',
-              artist: 'Artist',
-              album: 'Album',
-            },
-            reason: 'Soft harmonies',
-          },
-        ],
-      },
-    })
+    mocks.locale = 'en'
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({ data: daily })
   })
-  it('shows a configuration link only for administrators', async () => {
-    mocks.provider.getAIStatus.mockResolvedValue({
-      data: { configured: false },
+  afterEach(() => vi.useRealTimers())
+
+  it('reads saved daily picks on mount without generating AI or listing playlists', async () => {
+    renderCard()
+    expect(await screen.findByText(daily.analysis)).toBeInTheDocument()
+    expect(
+      mocks.provider.getAIDailyRecommendations,
+    ).toHaveBeenCalledExactlyOnceWith()
+    expect(
+      screen.getByRole('heading', { name: 'Your daily music picks' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('2026-10-25')).toHaveAttribute(
+      'datetime',
+      daily.generatedAt,
+    )
+    expect(screen.getByText(/Inspired by playlist:/)).toHaveTextContent(
+      'Evening jazz',
+    )
+    expect(screen.getByText('26/10/2026, 03:00')).toHaveAttribute(
+      'datetime',
+      daily.nextRunAt,
+    )
+    expectNoGeneration()
+  })
+
+  it('plays saved local recommendations through existing player actions', async () => {
+    renderCard()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Play Local song' }),
+    )
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'PLAYER_PLAY_TRACKS',
+        id: 'song',
+      }),
+    )
+    expectNoGeneration()
+  })
+
+  it('shows external song titles, artists and reasons without external play buttons', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
+      data: { ...daily, recommendations: [] },
+    })
+    renderCard()
+    expect(
+      await screen.findByRole('heading', { name: 'Come Away With Me' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Norah Jones')).toBeInTheDocument()
+    expect(screen.getByText('Gentle piano and warm vocals')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Play / })).toBeNull()
+    expectNoGeneration()
+  })
+
+  it('shows configuration only to administrators and hides cached results when disabled', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
+      data: { ...daily, state: 'disabled', configured: false },
     })
     const { unmount } = renderCard()
     expect(
       await screen.findByRole('button', { name: 'AI settings' }),
     ).toHaveAttribute('href', '/ai/settings')
-    expect(mocks.provider.getList).not.toHaveBeenCalled()
+    expect(screen.queryByText(daily.analysis)).toBeNull()
+    expect(screen.queryByText('Local song')).toBeNull()
     unmount()
     mocks.permissions = 'user'
     renderCard()
@@ -73,134 +149,85 @@ describe('AI music recommendations', () => {
         'Ask your administrator to connect an AI provider.',
       ),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'AI settings' }),
-    ).not.toBeInTheDocument()
-  })
-  it('calls AI only after an explicit click, then plays the returned local song through existing player actions', async () => {
-    renderCard()
-    const button = await screen.findByRole('button', {
-      name: 'Analyze and recommend',
-    })
-    expect(mocks.provider.getAIRecommendations).not.toHaveBeenCalled()
-    expect(
-      screen.getByText(/Audio files, file paths and account details stay here/),
-    ).toBeInTheDocument()
-    fireEvent.click(button)
-    await screen.findByText('Warm jazz textures')
-    expect(mocks.provider.getAIRecommendations).toHaveBeenCalledExactlyOnceWith(
-      'playlist',
-    )
-    expect(screen.getByText('Soft harmonies')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Play Local song' }))
-    expect(mocks.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'PLAYER_PLAY_TRACKS' }),
-    )
-  })
-  it('renders model output as text and never interprets generated HTML', async () => {
-    mocks.provider.getAIRecommendations.mockResolvedValue({
-      data: {
-        analysis: '<img src=x onerror=alert(1)>',
-        recommendations: [
-          {
-            song: { id: 'song', title: '<script>unsafe</script>' },
-            reason: '<a href="javascript:alert(1)">reason</a>',
-          },
-        ],
-      },
-    })
-    renderCard()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Analyze and recommend' }),
-    )
-    expect(
-      await screen.findByText('<img src=x onerror=alert(1)>'),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('link', { name: 'reason' }),
-    ).not.toBeInTheDocument()
-    expect(document.querySelector('script')).toBeNull()
-  })
-  it('blocks duplicate clicks, displays a bounded retry message and does not leak raw provider details', async () => {
-    let reject
-    mocks.provider.getAIRecommendations.mockImplementation(
-      () =>
-        new Promise((resolve, rejectPromise) => {
-          reject = rejectPromise
-        }),
-    )
-    renderCard()
-    const button = await screen.findByRole('button', {
-      name: 'Analyze and recommend',
-    })
-    fireEvent.click(button)
-    fireEvent.click(button)
-    expect(mocks.provider.getAIRecommendations).toHaveBeenCalledTimes(1)
-    expect(
-      screen.getByRole('button', { name: 'Listening to your taste…' }),
-    ).toBeDisabled()
-    reject({ body: { error: 'busy', secret: 'private' } })
-    expect(await screen.findByRole('alert')).toHaveTextContent('30 seconds')
-    expect(screen.queryByText('private')).not.toBeInTheDocument()
-    mocks.provider.getAIRecommendations.mockResolvedValueOnce({
-      data: { recommendations: [] },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(
-      await screen.findByText(/There are no other playable songs/),
-    ).toBeInTheDocument()
-  })
-  it('shows empty playlists and recoverable initial-load errors', async () => {
-    mocks.provider.getAIStatus.mockRejectedValueOnce(new Error('offline'))
-    mocks.provider.getList.mockResolvedValue({ data: [], total: 0 })
-    renderCard()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load')
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    await waitFor(() =>
-      expect(screen.getByText(/Create a playlist/)).toBeInTheDocument(),
-    )
+    expect(screen.queryByRole('button', { name: 'AI settings' })).toBeNull()
+    expectNoGeneration()
   })
 
-  it('shows external titles, artists and reasons alongside playable local songs', async () => {
-    const original = await mocks.provider.getAIRecommendations()
-    mocks.provider.getAIRecommendations.mockResolvedValue({
+  it('shows first-generation waiting and the next run time without an analysis action', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
       data: {
-        ...original.data,
-        externalRecommendations: [
-          {
-            title: 'Come Away With Me',
-            artist: 'Norah Jones',
-            reason: 'Gentle piano and warm vocals',
-          },
-        ],
+        ...daily,
+        state: 'pending',
+        recommendations: [],
+        externalRecommendations: [],
       },
     })
-    vi.clearAllMocks()
     renderCard()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Analyze and recommend' }),
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'prepared in the background',
     )
-    expect(
-      await screen.findByRole('heading', { name: 'Discover more songs' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: 'Come Away With Me' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Norah Jones')).toBeInTheDocument()
-    expect(screen.getByText('Gentle piano and warm vocals')).toBeInTheDocument()
+    expect(screen.queryByText(daily.analysis)).toBeNull()
+    expect(screen.getByText('26/10/2026, 03:00')).toBeInTheDocument()
+    expectNoGeneration()
+  })
+
+  it('keeps showing valid saved picks when the current daily update is stale', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
+      data: {
+        ...daily,
+        date: '2020-01-02',
+        generatedAt: '2020-01-02T03:00:00+08:00',
+        stale: true,
+      },
+    })
+    renderCard()
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'last saved picks',
+    )
+    expect(screen.getByText(daily.analysis)).toBeInTheDocument()
+    expect(screen.getByText('2020-01-02')).toHaveAttribute(
+      'datetime',
+      '2020-01-02T03:00:00+08:00',
+    )
     expect(
       screen.getByRole('button', { name: 'Play Local song' }),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Play Come Away With Me' }),
-    ).toBeNull()
-    expect(mocks.dispatch).not.toHaveBeenCalled()
+    expectNoGeneration()
   })
 
-  it('supports external recommendations when there are no local candidates and renders generated markup only as text', async () => {
-    mocks.provider.getAIRecommendations.mockResolvedValue({
+  it('shows background failure without exposing raw provider details or triggering a new call', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
+      data: { ...daily, state: 'failed', error: 'private provider response' },
+    })
+    renderCard()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'next daily update',
+    )
+    expect(screen.queryByText('private provider response')).toBeNull()
+    expect(screen.queryByText(daily.analysis)).toBeNull()
+    expectNoGeneration()
+  })
+
+  it('retries failed reads using GET only and never sends a generation request', async () => {
+    mocks.provider.getAIDailyRecommendations.mockRejectedValueOnce(
+      new Error('private provider detail'),
+    )
+    renderCard()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load your saved daily picks',
+    )
+    expect(screen.queryByText('private provider detail')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await screen.findByText(daily.analysis)
+    expect(mocks.provider.getAIDailyRecommendations).toHaveBeenCalledTimes(2)
+    expectNoGeneration()
+  })
+
+  it('renders cached model output as plain text', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
       data: {
-        analysis: 'Acoustic songwriting',
+        ...daily,
+        analysis: '<img src=x onerror=alert(1)>',
         recommendations: [],
         externalRecommendations: [
           {
@@ -212,18 +239,73 @@ describe('AI music recommendations', () => {
       },
     })
     renderCard()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Analyze and recommend' }),
-    )
     expect(
-      await screen.findByText('<script>new song</script>'),
+      await screen.findByText('<img src=x onerror=alert(1)>'),
     ).toBeInTheDocument()
+    expect(screen.getByText('<script>new song</script>')).toBeInTheDocument()
     expect(screen.getByText('<b>New artist</b>')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'reason' })).toBeNull()
     expect(document.querySelector('script')).toBeNull()
+  })
+
+  it.each([
+    ['pending', false, 60000],
+    ['ready', true, 60000],
+    ['ready', false, 300000],
+  ])(
+    'refreshes the saved result for %s, stale=%s and stops after unmount',
+    async (state, stale, delay) => {
+      vi.useFakeTimers()
+      mocks.provider.getAIDailyRecommendations.mockResolvedValue({
+        data: { ...daily, state, stale },
+      })
+      let rendered
+      await act(async () => {
+        rendered = renderCard()
+      })
+      expect(mocks.provider.getAIDailyRecommendations).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        vi.advanceTimersByTime(delay)
+      })
+      expect(mocks.provider.getAIDailyRecommendations).toHaveBeenCalledTimes(2)
+      rendered.unmount()
+      await act(async () => {
+        vi.advanceTimersByTime(delay * 2)
+      })
+      expect(mocks.provider.getAIDailyRecommendations).toHaveBeenCalledTimes(2)
+      expectNoGeneration()
+    },
+  )
+
+  it('handles an empty saved result without inventing playable tracks', async () => {
+    mocks.provider.getAIDailyRecommendations.mockResolvedValue({
+      data: { ...daily, recommendations: [], externalRecommendations: [] },
+    })
+    renderCard()
+    expect(
+      await screen.findByText(
+        'No saved songs are available to display. Your next daily picks will appear here.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Play / })).toBeNull()
-    expect(mocks.provider.getAIRecommendations).toHaveBeenCalledExactlyOnceWith(
-      'playlist',
-    )
+  })
+
+  it('shows the daily schedule and cached results in Chinese', async () => {
+    mocks.locale = 'zh-Hans'
+    renderCard()
+    expect(
+      await screen.findByRole('heading', { name: '每日为你精选' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('后台每天北京时间 03:00 自动更新。'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/2026\/10\/26/)).toHaveTextContent('03:00')
+    expect(
+      screen.getByRole('heading', { name: '为你推荐 · 曲库之外' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '播放 Local song' }),
+    ).toBeInTheDocument()
+    expectNoGeneration()
   })
 })

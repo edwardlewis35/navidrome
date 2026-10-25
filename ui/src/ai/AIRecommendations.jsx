@@ -1,21 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
-import { useDataProvider, usePermissions } from 'react-admin'
+import { useDataProvider, useLocale, usePermissions } from 'react-admin'
 import {
   Button,
   Card,
   CardContent,
   CircularProgress,
-  MenuItem,
-  TextField,
   Typography,
   makeStyles,
 } from '@material-ui/core'
 import { EmojiObjectsOutlined, PlayArrow } from '@material-ui/icons'
 import { playTracks } from '../actions'
 import { Artwork } from '../common/Artwork'
-import useAIText, { aiErrorText } from './useAIText'
+import useAIText from './useAIText'
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -37,13 +35,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 13,
     marginBottom: 20,
   },
-  controls: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  picker: { minWidth: 230, flex: '1 1 230px', maxWidth: 480 },
   privacy: {
     color: theme.palette.text.secondary,
     fontSize: 12,
@@ -86,56 +77,41 @@ const useStyles = makeStyles((theme) => ({
   },
 }))
 
+const nextRunLabel = (value, locale) => {
+  const date = new Date(value)
+  if (!value || Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(locale?.startsWith('zh') ? 'zh-CN' : 'en-GB', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
 export default function AIRecommendations() {
   const classes = useStyles()
   const text = useAIText()
+  const locale = useLocale()
   const provider = useDataProvider()
   const { permissions } = usePermissions()
   const dispatch = useDispatch()
   const [loading, setLoading] = useState(true)
-  const [configured, setConfigured] = useState(false)
-  const [playlists, setPlaylists] = useState([])
-  const [playlistId, setPlaylistId] = useState('')
-  const [error, setError] = useState('')
   const [loadError, setLoadError] = useState(false)
-  const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
   const [retry, setRetry] = useState(0)
-  const active = useRef(true)
-  const requesting = useRef(false)
 
   useEffect(() => {
-    active.current = true
     let cancelled = false
     setLoading(true)
     setLoadError(false)
-    const load = async () => {
-      const { data: status } = await provider.getAIStatus()
-      if (cancelled) return
-      setConfigured(status.configured)
-      if (!status.configured) return
-      const entries = []
-      let page = 1
-      while (!cancelled) {
-        const { data, total } = await provider.getList('playlist', {
-          pagination: { page, perPage: 100 },
-          sort: { field: 'name', order: 'ASC' },
-          filter: {},
-        })
-        entries.push(...data)
-        if (data.length < 100 || entries.length >= total) break
-        page += 1
-      }
-      if (!cancelled) {
-        setPlaylists(entries)
-        setPlaylistId((previous) =>
-          entries.some((entry) => entry.id === previous)
-            ? previous
-            : entries[0]?.id || '',
-        )
-      }
-    }
-    load()
+    provider
+      .getAIDailyRecommendations()
+      .then(({ data }) => {
+        if (!cancelled) setResult(data)
+      })
       .catch(() => {
         if (!cancelled) setLoadError(true)
       })
@@ -144,26 +120,24 @@ export default function AIRecommendations() {
       })
     return () => {
       cancelled = true
-      active.current = false
     }
   }, [provider, retry])
 
-  const analyze = async () => {
-    if (requesting.current || !playlistId) return
-    requesting.current = true
-    setBusy(true)
-    setError('')
-    setResult(null)
-    try {
-      const { data } = await provider.getAIRecommendations(playlistId)
-      if (active.current) setResult(data)
-    } catch (error) {
-      if (active.current) setError(aiErrorText(error, text))
-    } finally {
-      requesting.current = false
-      if (active.current) setBusy(false)
-    }
-  }
+  // Refresh only the saved result. The page never starts a model request.
+  useEffect(() => {
+    if (!result || loading || result.state === 'disabled') return undefined
+    const delay = result.state === 'pending' || result.stale ? 60000 : 300000
+    const timer = window.setInterval(
+      () => setRetry((value) => value + 1),
+      delay,
+    )
+    return () => window.clearInterval(timer)
+  }, [result, loading])
+
+  const disabled = result?.state === 'disabled' || result?.configured === false
+  const localSongs = result?.recommendations || []
+  const externalSongs = result?.externalRecommendations || []
+  const nextRun = nextRunLabel(result?.nextRunAt, locale)
 
   return (
     <Card
@@ -175,21 +149,21 @@ export default function AIRecommendations() {
       <CardContent className={classes.content}>
         <Typography component="h2" className={classes.heading}>
           <EmojiObjectsOutlined color="primary" />
-          {text.discoverTitle}
+          {text.dailyTitle}
         </Typography>
         <Typography className={classes.description}>
-          {text.description}
+          {text.dailyDescription}
         </Typography>
-        {loading ? (
+        {loading && !result ? (
           <CircularProgress size={24} aria-label={text.loading} />
         ) : loadError ? (
           <div role="alert">
-            <p>{text.loadError}</p>
+            <p>{text.dailyLoadError}</p>
             <Button onClick={() => setRetry((value) => value + 1)}>
               {text.retry}
             </Button>
           </div>
-        ) : !configured ? (
+        ) : disabled ? (
           <div>
             <Typography>{text.notConfigured}</Typography>
             {permissions === 'admin' ? (
@@ -202,56 +176,45 @@ export default function AIRecommendations() {
               </Typography>
             )}
           </div>
-        ) : playlists.length === 0 ? (
-          <Typography>{text.noPlaylists}</Typography>
         ) : (
           <>
-            <div className={classes.controls}>
-              <TextField
-                select
-                variant="outlined"
-                size="small"
-                id="ai-playlist"
-                label={text.playlist}
-                value={playlistId}
-                disabled={busy}
-                className={classes.picker}
-                onChange={(event) => {
-                  setPlaylistId(event.target.value)
-                  setResult(null)
-                  setError('')
-                }}
-              >
-                {playlists.map((playlist) => (
-                  <MenuItem key={playlist.id} value={playlist.id}>
-                    {playlist.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                variant="contained"
-                color="primary"
-                disabled={busy || !playlistId}
-                onClick={analyze}
-              >
-                {busy ? text.analyzing : text.analyze}
-              </Button>
-            </div>
-            <Typography className={classes.privacy}>{text.privacy}</Typography>
-            <Typography className={classes.privacy}>{text.sampled}</Typography>
-            {busy && (
-              <div role="status" className={classes.status}>
-                <CircularProgress size={22} aria-label={text.analyzing} />
-              </div>
+            <Typography className={classes.privacy}>
+              {text.dailySchedule}
+            </Typography>
+            {nextRun && (
+              <Typography className={classes.privacy}>
+                {text.dailyNextRun}{' '}
+                <time dateTime={result.nextRunAt}>{nextRun}</time>
+              </Typography>
             )}
-            {error && (
-              <div role="alert" className={classes.status}>
-                <Typography>{error}</Typography>
-                <Button onClick={analyze}>{text.retry}</Button>
-              </div>
-            )}
-            {result && (
+            {result?.state === 'pending' ? (
+              <Typography role="status" className={classes.status}>
+                {text.dailyPending}
+              </Typography>
+            ) : result?.state === 'failed' ? (
+              <Typography role="alert" className={classes.status}>
+                {text.dailyFailed}
+              </Typography>
+            ) : result?.state === 'ready' ? (
               <div aria-live="polite">
+                {result.stale && (
+                  <Typography role="status" className={classes.status}>
+                    {text.dailyStale}
+                  </Typography>
+                )}
+                {result.date && (
+                  <Typography className={classes.privacy}>
+                    {text.dailyDate}{' '}
+                    <time dateTime={result.generatedAt || result.date}>
+                      {result.date}
+                    </time>
+                  </Typography>
+                )}
+                {result.sourcePlaylistName && (
+                  <Typography className={classes.privacy}>
+                    {text.dailySource} {result.sourcePlaylistName}
+                  </Typography>
+                )}
                 {result.analysis && (
                   <div className={classes.analysis}>
                     <Typography component="h3" variant="subtitle1">
@@ -260,7 +223,7 @@ export default function AIRecommendations() {
                     <Typography>{result.analysis}</Typography>
                   </div>
                 )}
-                {result.recommendations?.length ? (
+                {localSongs.length > 0 && (
                   <>
                     <Typography
                       component="h3"
@@ -270,7 +233,7 @@ export default function AIRecommendations() {
                       {text.recommendations}
                     </Typography>
                     <ul className={classes.list}>
-                      {result.recommendations.map(({ song, reason }) => (
+                      {localSongs.map(({ song, reason }) => (
                         <li key={song.id} className={classes.song}>
                           <Artwork
                             record={song}
@@ -282,7 +245,9 @@ export default function AIRecommendations() {
                               {song.title}
                             </Typography>
                             <Typography className={classes.artist}>
-                              {song.artist} · {song.album}
+                              {[song.artist, song.album]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </Typography>
                             <Typography className={classes.reason}>
                               {reason}
@@ -303,25 +268,21 @@ export default function AIRecommendations() {
                       ))}
                     </ul>
                   </>
-                ) : (
-                  <Typography className={classes.status}>
-                    {text.noCandidates}
-                  </Typography>
                 )}
-                <Typography
-                  component="h3"
-                  variant="subtitle1"
-                  className={classes.status}
-                >
-                  {text.externalRecommendations}
-                </Typography>
-                <Typography className={classes.privacy}>
-                  {text.externalHelp}
-                </Typography>
-                {result.externalRecommendations?.length ? (
-                  <ul className={classes.list}>
-                    {result.externalRecommendations.map(
-                      ({ title, artist, reason }) => (
+                {externalSongs.length > 0 && (
+                  <>
+                    <Typography
+                      component="h3"
+                      variant="subtitle1"
+                      className={classes.status}
+                    >
+                      {text.externalRecommendations}
+                    </Typography>
+                    <Typography className={classes.privacy}>
+                      {text.externalHelp}
+                    </Typography>
+                    <ul className={classes.list}>
+                      {externalSongs.map(({ title, artist, reason }) => (
                         <li
                           key={JSON.stringify([title, artist])}
                           className={classes.song}
@@ -343,15 +304,20 @@ export default function AIRecommendations() {
                             )}
                           </div>
                         </li>
-                      ),
-                    )}
-                  </ul>
-                ) : (
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {localSongs.length === 0 && externalSongs.length === 0 && (
                   <Typography className={classes.status}>
-                    {text.noExternalRecommendations}
+                    {text.dailyEmpty}
                   </Typography>
                 )}
               </div>
+            ) : (
+              <Typography role="status" className={classes.status}>
+                {text.dailyPending}
+              </Typography>
             )}
           </>
         )}

@@ -47,6 +47,7 @@ type AIMusic struct {
 	dataFolder  string
 	client      *http.Client
 	mu          sync.Mutex
+	dailyMu     sync.Mutex
 	busy        chan struct{}
 	lastRequest map[string]time.Time
 }
@@ -131,6 +132,10 @@ func (s *AIMusic) Status(ctx context.Context) (AIMusicStatus, error) {
 }
 
 func (s *AIMusic) acquire(userID string) (func(), error) {
+	return s.acquireAt(userID, time.Now())
+}
+
+func (s *AIMusic) acquireAt(userID string, now time.Time) (func(), error) {
 	select {
 	case s.busy <- struct{}{}:
 	default:
@@ -138,7 +143,6 @@ func (s *AIMusic) acquire(userID string) (func(), error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	now := time.Now()
 	for id, last := range s.lastRequest {
 		if now.Sub(last) >= time.Minute {
 			delete(s.lastRequest, id)

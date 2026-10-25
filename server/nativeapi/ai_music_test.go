@@ -5,13 +5,57 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/navidrome/navidrome/core"
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/model/request"
 	"github.com/navidrome/navidrome/tests"
 )
+
+func TestAIMusicDailyGETOnlyReadsSavedResults(t *testing.T) {
+	var providerCalls atomic.Int32
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		providerCalls.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer provider.Close()
+	api := &Router{ds: &tests.MockDataStore{}}
+	router := chi.NewRouter()
+	api.addAIMusicRoutes(router)
+	admin := model.User{ID: "admin", IsAdmin: true}
+	ctx := request.WithUser(t.Context(), admin)
+	if _, err := api.AIMusicService().UpdateSettings(ctx, core.AIMusicSettingsUpdate{Enabled: true, Endpoint: provider.URL, Model: "daily-fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	w := aiTestRequest(router, http.MethodGet, "/ai/daily", "", model.User{})
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous daily access: %d", w.Code)
+	}
+	for range 3 {
+		w = aiTestRequest(router, http.MethodGet, "/ai/daily", "", model.User{ID: "listener"})
+		if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatalf("daily read failed: %d %s", w.Code, w.Body.String())
+		}
+		var result map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if result["state"] != "pending" || result["configured"] != true {
+			t.Fatalf("empty daily cache has wrong state: %s", w.Body.String())
+		}
+		for _, field := range []string{"endpoint", "model", "apiKey", "encryptedKey"} {
+			if _, exposed := result[field]; exposed {
+				t.Fatalf("daily response exposed %s", field)
+			}
+		}
+	}
+	if providerCalls.Load() != 0 {
+		t.Fatal("reading the homepage or retrying started a model request")
+	}
+}
 
 func aiTestRouter() http.Handler {
 	ds := &tests.MockDataStore{}

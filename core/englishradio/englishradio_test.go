@@ -189,6 +189,38 @@ func TestTicketExpiryAndInvalidResponses(t *testing.T) {
 	}
 }
 
+func TestEveryCatalogStationUsesItsConfiguredStream(t *testing.T) {
+	seen := map[string]bool{}
+	for _, station := range Catalog() {
+		if seen[station.ID] {
+			t.Fatalf("duplicate station ID: %s", station.ID)
+		}
+		seen[station.ID] = true
+		t.Run(station.ID, func(t *testing.T) {
+			s, _, _, ctx := radioFixture(t)
+			requests := 0
+			installFixtureStream(s, func(r *http.Request) (*http.Response, error) {
+				requests++
+				if r.URL.String() != station.streamURL {
+					t.Fatalf("wrong upstream for %s: %s", station.ID, r.URL)
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"audio/mpeg"}}, Body: io.NopCloser(strings.NewReader("fixture-audio"))}, nil
+			})
+			value, err := s.Ticket(ctx, station.ID)
+			if err != nil || requests != 0 {
+				t.Fatalf("ticket did not resolve without connecting: %v", err)
+			}
+			body, contentType, err := s.Open(ctx, station.ID, value)
+			if err != nil || contentType != "audio/mpeg" || requests != 1 {
+				t.Fatalf("catalog station could not play: %v", err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestOnlyFixedHTTPSBroadcasterURLsAreAllowed(t *testing.T) {
 	for _, station := range Catalog() {
 		u, _ := url.Parse(station.streamURL)
@@ -196,7 +228,19 @@ func TestOnlyFixedHTTPSBroadcasterURLsAreAllowed(t *testing.T) {
 			t.Fatal("catalogue URL rejected")
 		}
 	}
-	for _, raw := range []string{"http://media-ice.musicradio.com/HeartLondonMP3", "https://127.0.0.1/HeartLondonMP3", "https://media-ice.musicradio.com.evil.example/HeartLondonMP3", "https://media-ice.musicradio.com:444/HeartLondonMP3", "https://user@media-ice.musicradio.com/HeartLondonMP3", "https://media-ice.musicradio.com/HeartLondonMP3?target=private", "https://media-ice.musicradio.com/unknown"} {
+	for _, raw := range []string{
+		"http://media-ice.musicradio.com/HeartLondonMP3",
+		"https://127.0.0.1/HeartLondonMP3",
+		"https://media-ice.musicradio.com.evil.example/HeartLondonMP3",
+		"https://media-ice.musicradio.com:444/HeartLondonMP3",
+		"https://user@media-ice.musicradio.com/HeartLondonMP3",
+		"https://media-ice.musicradio.com/HeartLondonMP3?target=private",
+		"https://media-ice.musicradio.com/CapitalMP3?",
+		"https://media-ice.musicradio.com/CapitalMP3#other-source",
+		"https://media-ice.musicradio.com/CapitalMP3/other-source",
+		"https://media-ice.musicradio.com/CapitalLondonMP3",
+		"https://media-ice.musicradio.com/unknown",
+	} {
 		u, _ := url.Parse(raw)
 		if allowedStreamURL(u) {
 			t.Fatalf("untrusted redirect allowed: %s", raw)

@@ -49,6 +49,7 @@ type Router struct {
 	imgUpload     artwork.Uploader
 	provider      external.Provider
 	quickConnect  quickconnect.QuickConnect
+	aiMusic       *core.AIMusic
 }
 
 func New(ds model.DataStore, share core.Share, playlists playlistsvc.Playlists, insights metrics.Insights, libraryService core.Library, userService core.User, maintenance core.Maintenance, pluginManager PluginManager, imgUpload artwork.Uploader, provider external.Provider, quickConnect quickconnect.QuickConnect) *Router {

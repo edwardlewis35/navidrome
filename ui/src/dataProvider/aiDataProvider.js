@@ -3,6 +3,8 @@ import { REST_URL } from '../consts'
 export const createAIDataProvider = (httpClient) => ({
   getAIStatus: () =>
     httpClient(`${REST_URL}/ai/status`).then(({ json }) => ({ data: json })),
+  getAIDailyRecommendations: () =>
+    httpClient(`${REST_URL}/ai/daily`).then(({ json }) => ({ data: json })),
   getAISettings: () =>
     httpClient(`${REST_URL}/ai/settings`).then(({ json }) => ({ data: json })),
   updateAISettings: (_resource, { data }) =>

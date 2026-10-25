@@ -48,6 +48,11 @@ var stations = []Station{
 	{ID: "heart-london", Name: "Heart London", Description: "London · pop and feel-good hits", HomePageURL: "https://www.heart.co.uk/london/", SourceURL: "https://www.heart.co.uk/radio/how-to-listen/getting-started/", streamURL: "https://media-ice.musicradio.com/HeartLondonMP3"},
 	{ID: "lbc-news", Name: "LBC News UK", Description: "United Kingdom · news and current affairs", HomePageURL: "https://www.lbc.co.uk/news/", SourceURL: "https://www.lbc.co.uk/radio/how-to-listen/", streamURL: "https://media-ice.musicradio.com/LBCUKMP3"},
 	{ID: "classic-fm", Name: "Classic FM", Description: "United Kingdom · classical music", HomePageURL: "https://www.classicfm.com/", SourceURL: "https://www.classicfm.com/radio/how-to-listen/", streamURL: "https://media-ice.musicradio.com/ClassicFMMP3"},
+	{ID: "capital-london", Name: "Capital London", Description: "London · contemporary hits", HomePageURL: "https://www.capitalfm.com/london/", SourceURL: "https://www.capitalfm.com/london/", streamURL: "https://media-ice.musicradio.com/CapitalMP3"},
+	{ID: "smooth-london", Name: "Smooth London", Description: "London · relaxed favourites", HomePageURL: "https://www.smoothradio.com/london/", SourceURL: "https://www.smoothradio.com/radio/how-to-listen/", streamURL: "https://media-ice.musicradio.com/SmoothLondonMP3"},
+	{ID: "radio-x-uk", Name: "Radio X UK", Description: "United Kingdom · indie and alternative rock", HomePageURL: "https://www.radiox.co.uk/", SourceURL: "https://www.radiox.co.uk/radio/how-to-listen/", streamURL: "https://media-ice.musicradio.com/RadioXUKMP3"},
+	{ID: "gold-radio", Name: "Gold Radio", Description: "United Kingdom · all-time classics", HomePageURL: "https://www.goldradio.com/", SourceURL: "https://www.goldradio.com/radio/how-to-listen/", streamURL: "https://media-ice.musicradio.com/GoldMP3"},
+	{ID: "heart-80s", Name: "Heart 80s", Description: "United Kingdom · 1980s hits", HomePageURL: "https://www.heart.co.uk/80s/", SourceURL: "https://www.heart.co.uk/80s/radio/how-to-listen/", streamURL: "https://media-ice.musicradio.com/Heart80sMP3"},
 }
 
 type Settings struct {
@@ -124,13 +129,18 @@ func radioClient(proxy string) (*http.Client, error) {
 }
 
 func allowedStreamURL(u *url.URL) bool {
-	if u == nil || u.Scheme != "https" || u.User != nil || (u.Port() != "" && u.Port() != "443") || u.RawQuery != "" || u.Fragment != "" {
+	if u == nil || u.Scheme != "https" || u.User != nil || (u.Port() != "" && u.Port() != "443") || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
 		return false
 	}
 	if u.Hostname() != "media-ice.musicradio.com" && u.Hostname() != "icecast.thisisdax.com" {
 		return false
 	}
-	return u.Path == "/HeartLondonMP3" || u.Path == "/LBCUKMP3" || u.Path == "/ClassicFMMP3"
+	switch u.Path {
+	case "/HeartLondonMP3", "/LBCUKMP3", "/ClassicFMMP3", "/CapitalMP3", "/SmoothLondonMP3", "/RadioXUKMP3", "/GoldMP3", "/Heart80sMP3":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) loadLocked(ctx context.Context) error {
